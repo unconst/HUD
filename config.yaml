@@ -1,0 +1,42 @@
+nukes:
+  N0:
+    sshkey: "~/.ssh/marius"
+    ip_address: "137.184.130.112"
+
+  N1:
+    sshkey: "~/.ssh/marius"
+    ip_address: "137.184.130.112"
+    
+  N2:
+    sshkey: "~/.ssh/marius"
+    ip_address: "137.184.130.112"
+
+  N3:
+    sshkey: "~/.ssh/marius"
+    ip_address: "137.184.130.112"
+
+  N4:
+    sshkey: "~/.ssh/marius"
+    ip_address: "137.184.130.112"
+
+  N5:
+    sshkey: "~/.ssh/marius"
+    ip_address: "137.184.130.112"
+  
+  N6:
+    sshkey: "~/.ssh/marius"
+    ip_address: "137.184.130.112"
+    branch: master
+  
+  N7:
+    sshkey: "~/.ssh/marius"
+    ip_address: "137.184.130.112"
+     
+  N8:
+    sshkey: "~/.ssh/marius"
+    ip_address: "137.184.130.112"
+  
+  N9:
+    sshkey: "~/.ssh/marius"
+    ip_address: "137.184.130.112"
+  
