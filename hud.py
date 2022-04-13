@@ -29,7 +29,14 @@ from rich import print
 from rich.console import Console
 from rich.table import Table
 from rich import pretty
+import patchwork.transfers
 pretty.install()
+
+from retry import retry
+
+from loguru import logger
+logger.add( sys.stdout, format="{level} {message}", level="INFO", colorize=True, enqueue=True)
+
 
 DEBUG = False
 VERSION = "0.1.0"
@@ -78,13 +85,18 @@ class Neuron:
     def run( self, cmd:str ):
         if DEBUG:
             print ( "{}| Running: {}".format(self.name, cmd) )
-        result = self.connection.run( cmd, hide = not DEBUG)
+        result = self.connection.run( cmd, warn = True, hide = not DEBUG)
         return result
 
     @property
     def is_installed( self ) -> bool:
         result = self.run( 'python3 -c "import bittensor"' )
         return result.ok
+
+    @retry(tries=3)
+    def get_neuron( self ) -> dict:
+        sub = bittensor.subtensor(network='nakamoto')
+        return sub.neuron_for_pubkey( ss58_hotkey = self.wallet.hotkey.ss58_address )
 
     @property
     def neuron(self) -> 'bittensor.Neuron':
@@ -97,21 +109,24 @@ class Neuron:
 
     @property
     def hotkey( self ) -> str:
-        result = self.run( "cat ~/.bittensor/wallets/default/hotkeys/default" )
+        result = self.run( "cat ~/.bittensor/wallets/{}/hotkeys/{}".format( self.wallet.name, self.wallet.hotkey_str )  )
         if result.failed: return None
         else: return json.loads(result.stdout)['ss58Address']
 
     @property
     def coldkey( self ) -> str:
-        result = self.run( "cat ~/.bittensor/wallets/default/coldkeypub.txt" )
+        result = self.run( "cat ~/.bittensor/wallets/{}/coldkeypub.txt".format( self.wallet.name ) )
         if result.failed: return None
         else: return json.loads(result.stdout)['ss58Address']
 
     @property
     def branch(self) -> str:
-        result = self.run( 'cd ~/.bittensor/bittensor ; git branch --show-current' )
-        if result.failed: return None
-        else: return result.stdout.strip()
+        try:
+            result = self.run( 'cd ~/.bittensor/bittensor ; git branch --show-current' )
+            if result.failed: return None
+            else: return result.stdout.strip()
+        except:
+            return 'None'
 
     @property
     def is_running( self ) -> bool:
@@ -128,7 +143,7 @@ class Neuron:
         self.run("sudo npm install pm2@latest -g")
         self.run('mkdir -p ~/.bittensor/bittensor/')
         self.run('rm -rf ~/.bittensor/bittensor')
-        self.run('git clone --recurse-submodules https://github.com/opentensor/bittensor.git ~/.bittensor/bittensor"')
+        self.run('git clone --recurse-submodules https://github.com/opentensor/bittensor.git ~/.bittensor/bittensor')
         self.run('cd ~/.bittensor/bittensor ; pip3 install -e .')
         self.run("sudo apt-get update && sudo apt install docker.io -y && rm /usr/bin/docker-compose || true && curl -L https://github.com/docker/compose/releases/download/1.29.2/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose && sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose  && rm -rf subtensor || true && git clone https://github.com/opentensor/subtensor.git && cd subtensor && docker-compose up -d")
     
@@ -156,13 +171,14 @@ class Neuron:
     def reboot( self ):
         self.run( "sudo shutdown -r now -f")
 
-    def get_neuron( self ) -> dict:
-        sub = bittensor.subtensor(network='nakamoto')
-        return sub.neuron_for_pubkey( ss58_hotkey = self.wallet.hotkey.ss58_address )
-
     # write a function that returns the CPU usage of the machine
     def get_cpu_usage( self ):
         result = self.run( "top -bn1 | grep load | awk '{printf \"CPU: %.2f\", $(NF-2)}'" )
+        return result.stdout
+
+    # write a function that returns all running procesess on the machine
+    def get_running_procs(self):
+        result = self.run( "ps aux" )
         return result.stdout
 
     def load_wallet( self ):
@@ -177,17 +193,31 @@ class Neuron:
 
     def register( 
             self, 
-            wallet: 'bittensor.Wallet', 
-            timeout:int = 10000 
+            wallet: 'bittensor.Wallet' 
         ):
         self.add_wallet( wallet )
         self.connection.run(
-            "python3 ~/.bittensor/bittensor/bin/btcli register --wallet.name {} --wallet.hotkey {} --no_prompt".format( wallet.name, wallet.hotkey_str ), 
+            "pm2 start ~/.bittensor/bittensor/bin/btcli --name register_{}_{} --interpreter python3 -- register --wallet.name {} --wallet.hotkey {} --no_prompt".format( wallet.name, wallet.hotkey_str, wallet.name, wallet.hotkey_str ), 
             warn=False, 
-            hide=False, 
+            hide=not DEBUG, 
             disown = False, 
-            timeout = 60
         )
+
+    def subtensor_best(self) -> int:
+        sublogs = self.run( 'docker logs node-subtensor --tail 100').stderr
+        idx = int(sublogs.rfind("best: #"))
+        return int( sublogs[idx + 7: idx + 14] )
+
+    def kill_register( self, wallet: 'bittensor.Wallet' ):
+        self.connection.run(
+            "pm2 delete register_{}_{}".format( wallet.name, wallet.hotkey_str ), 
+            warn=False, 
+            hide=not DEBUG, 
+            disown = False, 
+        )
+
+    def kill_old_register( self, wallet: 'bittensor.Wallet' ):
+        self.run( "pm2 delete registration")
 
     def stats(self, forced:bool = False, refresh_secs: int = 60 * 20) -> dict:
         seconds_since_epoch = int( time.time() )
@@ -243,9 +273,29 @@ class HUD:
     def set_debug(debug):
         global DEBUG
         DEBUG = debug
+    
+    @staticmethod
+    def append_to_config( neurons: list['Neuron'] ):
+        config = {}
+        for n in neurons:
+            if n.wallet.name not in config:
+                config[n.wallet.name] = {}
+            config[ n.wallet.name ][ n.wallet.hotkey_str ] = {  'sshkey': str(n.sshkey), 'ip_address': str(n.ip_address) }
+        with open( 'config.yaml', 'a' ) as f:
+            yaml.dump( config, f, default_flow_style=False )
 
     @staticmethod
-    def load_from_digital_ocean( tag:str = None ) -> dict['Neuron']:
+    def write_to_config( neurons: list['Neuron'] ):
+        config = {}
+        for n in neurons:
+            if n.wallet.name not in config:
+                config[n.wallet.name] = {}
+            config[ n.wallet.name ][ n.wallet.hotkey_str ] = {  'sshkey': str(n.sshkey), 'ip_address': str(n.ip_address) }
+        with open( 'config.yaml', 'w' ) as f:
+            yaml.dump( config, f, default_flow_style=False )
+
+    @staticmethod
+    def load_from_digital_ocean( tag:str = None ) -> list['Neuron']:
         manager = digitalocean.Manager( token = os.getenv( 'MARIUS_DOTOKEN' ))
         if tag is None:
             droplets = manager.get_all_droplets()
@@ -267,46 +317,123 @@ class HUD:
         return neurons
 
     @staticmethod
-    def load_all_from_config() -> dict['Neuron']:
+    def load_all_from_config( tag: str = None ) -> dict[list['Neuron']]:
         with open( 'config.yaml', "r") as config_file:
             config = yaml.safe_load(config_file)
         neurons = []
-        config = bittensor.Config.fromDict(config)
-        for coldkey in config:
-            for hotkey in config[coldkey]:
-                name = "{}-{}".format( coldkey, hotkey )
+        if tag == None:
+            config = bittensor.Config.fromDict(config)
+            for coldkey in config:
+                for hotkey in config[coldkey]:
+                    name = "{}-{}".format( coldkey, hotkey )
+                    neurons.append( Neuron(
+                        name = name,
+                        sshkey = config[coldkey][hotkey]['sshkey'],
+                        ip_address = config[coldkey][hotkey]['ip_address'],
+                        wallet = bittensor.wallet( name = coldkey, hotkey=hotkey)
+                    ))
+        else:
+            config = bittensor.Config.fromDict(config)[tag]
+            for hotkey in config:
+                name = "{}-{}".format( tag, hotkey )
                 neurons.append( Neuron(
                     name = name,
-                    sshkey = config[coldkey][hotkey]['sshkey'],
-                    ip_address = config[coldkey][hotkey]['ip_address'],
-                    wallet = bittensor.wallet( name = coldkey, hotkey=hotkey)
+                    sshkey = config[hotkey]['sshkey'],
+                    ip_address = config[hotkey]['ip_address'],
+                    wallet = bittensor.wallet( name = tag, hotkey=hotkey)
                 ))
         return neurons
 
+
     @staticmethod
-    def load_coldkey_from_config(coldkey:str) -> dict['Neuron']:
-        with open( 'config.yaml', "r") as config_file:
-            config = yaml.safe_load(config_file)
-        neurons = []
-        config = bittensor.Config.fromDict(config)
-        for hotkey in config[coldkey]:
-            name = "{}-{}".format( coldkey, hotkey )
-            neurons.append(  Neuron(
-                name = name,
-                sshkey = config[coldkey][hotkey]['sshkey'],
-                ip_address = config[coldkey][hotkey]['ip_address'],
-                wallet = bittensor.wallet( name = coldkey, hotkey=hotkey)
-            ))
-        return neurons
+    def rsync( neurons: List[Neuron] ):
+        results = {}
+        import subprocess
+        for n in tqdm( neurons ):
+            command = "rsync  -pthrvz  --rsh='ssh -i {} -p 22 ' copy root@{}:/root/copy".format(n.sshkey, n.ip_address)
+            results[n.name] = subprocess.run(command, shell=True)
+        return results
+
+    @staticmethod
+    def run( neurons: List[Neuron], script:str, disown: bool = True, hide:bool = not DEBUG, warn:bool = False) -> List[str]:
+        results = {}
+        def _run(n):
+            if not hide: logger.info( 'Running | {} | warn:{}, hide:{}, disown:{}, script:{} '.format( n.name, warn, hide, disown, script ) )
+            try:
+                result = n.connection.run(
+                    script, 
+                    warn = warn, 
+                    hide = hide, 
+                    disown = disown, 
+                )
+                results[n.name] = result
+            except Exception as e:
+                if warn or not hide: logger.warning( 'Error | {} | error:{}'.format( n.name, e ) )
+
+        with ThreadPoolExecutor(max_workers=len(neurons)) as executor:
+            for n in tqdm( neurons ):
+                executor.submit(_run, n)
+        return results
+
+
+    @staticmethod
+    def register( workers, neuron, timeout) -> bool:
+        def _kill_register(worker):
+            logger.info( 'Killing | {} '.format( worker.name ) )
+            worker.kill_register( neuron.wallet )
+        with ThreadPoolExecutor(max_workers=len(workers)) as executor:
+            for worker in workers:
+                executor.submit(_kill_register, worker)
+        def _register(worker):
+            logger.info( 'Killing | {} '.format( worker.name ) )
+            worker.register( neuron.wallet )
+        with ThreadPoolExecutor(max_workers=len(workers)) as executor:
+            for worker in workers:
+                executor.submit(_register, worker)
+        print ('Registrations sumbitted')
+        inc = 5
+        n_blocks = int( timeout / inc )
+        blocks = list(range(n_blocks))
+        for b in tqdm(blocks):
+            try:
+                meta = neuron.get_neuron()
+                if not meta.is_null:
+                    print ('Registered :)')
+                    return True
+            except Exception as e:
+                print ( '{}'.format(e) )
+            time.sleep(inc)
+        def _kill_register(worker):
+            worker.kill_register( neuron.wallet )
+        with ThreadPoolExecutor(max_workers=len(workers)) as executor:
+            for worker in workers:
+                print ('Killing: {} --> {}'.format(neuron.wallet, worker ))
+                executor.submit(_kill_register, worker)
+        print ('Failed to register :( ')
+        return False
+
+
 
     @staticmethod
     def status(neurons:dict['Neuron'], forced:bool = False, refresh_secs: int = 60 * 20) -> dict:
         def get_stats(neuron):
-            return neuron.stats(forced = forced, refresh_secs = refresh_secs)
-        stats = []
-        with ThreadPoolExecutor(max_workers=len(neurons)) as executor:
-            stats = list(tqdm(executor.map(get_stats, neurons), total=len(neurons)))
-        return pd.DataFrame( stats, columns=stats[0].keys() )
+            try:
+                return neuron.stats(forced = forced, refresh_secs = refresh_secs)
+            except:
+                return 
+
+        def get_pandas(list_neurons):
+            stats = []
+            with ThreadPoolExecutor(max_workers=len(list_neurons)) as executor:
+                stats = list(tqdm(executor.map(get_stats, list_neurons), total=len(list_neurons)))
+            return pd.DataFrame( stats, columns=stats[0].keys() )
+        if isinstance( neurons, list):
+            return get_pandas( neurons )
+        else:
+            result = []
+            for key in neurons.keys():
+                result.append( get_pandas( neurons[key] ))
+            return pd.concat( result, axis=0 )
 
     @staticmethod
     def rich_row( stats ) -> str:
