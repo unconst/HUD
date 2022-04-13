@@ -133,6 +133,10 @@ class Neuron:
         result = self.run( 'pm2 pid script')
         if len(result.stdout) > 1: return True
         else: return False  
+
+    def pull(self):
+        self.run('rm -rf ~/HUD')
+        self.run('git clone --recurse-submodules https://github.com/unconst/HUD.git ~/HUD')
     
     def install(self):
         self.run("sudo apt-get update && sudo apt-get install --no-install-recommends --no-install-suggests -y apt-utils curl git cmake build-essential gnupg lsb-release ca-certificates software-properties-common apt-transport-https")
