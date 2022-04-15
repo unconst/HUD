@@ -6,7 +6,7 @@ import bittensor
 import os
 import yaml
 import json
-from typing import List
+from typing import List, Optional
 from fabric import Connection
 import pandas as pd
 
@@ -350,16 +350,13 @@ class HUD:
 
 
     @staticmethod
-    def rsync( neurons: List[Neuron] ):
-        results = {}
-        import subprocess
-        for n in tqdm( neurons ):
-            command = "rsync  -pthrvz  --rsh='ssh -i {} -p 22 ' copy root@{}:/root/copy".format(n.sshkey, n.ip_address)
-            results[n.name] = subprocess.run(command, shell=True)
-        return results
+    def pull( neurons: List[Neuron], disown: bool = False, hide:bool = not DEBUG, warn:bool = False):
+        return HUD.run( neurons, script = "rm -rf ~/HUD && git clone --recurse-submodules https://github.com/unconst/HUD.git ~/HUD", disown=disown, hide=hide, warn=warn )
 
     @staticmethod
-    def run( neurons: List[Neuron], script:str, disown: bool = True, hide:bool = not DEBUG, warn:bool = False) -> List[str]:
+    def run( neurons: Optional[List[Neuron]], script:str, disown: bool = False, hide:bool = not DEBUG, warn:bool = False) -> List[str]:
+        if isinstance(neurons, Neuron):
+            neurons = [neurons]
         results = {}
         def _run(n):
             if not hide: logger.info( 'Running | {} | warn:{}, hide:{}, disown:{}, script:{} '.format( n.name, warn, hide, disown, script ) )
@@ -381,7 +378,14 @@ class HUD:
 
 
     @staticmethod
-    def register( workers, neuron, timeout) -> bool:
+    def register( workers, neuron, timeout, network:str = "nakamoto") -> bool:
+        HUD.run( workers, script = "mkdir -p ~/.bittensor/wallets/{}/hotkeys".format( neuron.wallet.name ), disown = False, hide = False, warn = True )
+        HUD.run( workers, script = "echo '{}' > ~/.bittensor/wallets/{}/hotkeys/{}".format( open(neuron.wallet.hotkey_file.path, 'r').read(), neuron.wallet.name, neuron.wallet.hotkey_str ), disown = False, hide = False, warn = True )
+        HUD.run( workers, script = "echo '{}' > ~/.bittensor/wallets/{}/coldkeypub.txt".format( open(neuron.wallet.coldkeypub_file.path, 'r').read(), neuron.wallet.name ), disown = False, hide = False, warn = True )
+        HUD.run( workers, script = "pkill -f pow.py", disown = False, hide = False, warn = True )
+        HUD.run( workers, script = "nohup python3 pow.py --subtensor.network {} --wallet.name {} --wallet.hotkey {} > pow_{}_{}.out 2>&1".format(network, neuron.wallet.name, neuron.wallet.hotkey_str, neuron.wallet.name, neuron.wallet.hotkey_str), disown = False, hide = False, warn = True )
+
+
         def _kill_register(worker):
             logger.info( 'Killing | {} '.format( worker.name ) )
             worker.kill_register( neuron.wallet )
@@ -420,6 +424,8 @@ class HUD:
 
     @staticmethod
     def status(neurons:dict['Neuron'], forced:bool = False, refresh_secs: int = 60 * 20) -> dict:
+        if isinstance(neurons, Neuron):
+            neurons = [neurons]
         def get_stats(neuron):
             try:
                 return neuron.stats(forced = forced, refresh_secs = refresh_secs)

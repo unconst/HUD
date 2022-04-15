@@ -10,9 +10,13 @@ import time
 import torch
 import numbers
 import pandas
+import argparse
 import json
+import sys
 from typing import Any, Tuple, List, Union, Optional
 
+from loguru import logger
+logger.add( sys.stdout, format="{time} {level} {message}", level="INFO", colorize=True, enqueue=True)
 
 def indexed_values_to_dataframe ( 
         prefix: Union[str, int],
@@ -122,6 +126,7 @@ def solve_for_difficulty_fast( subtensor, wallet, num_processes: int = None, upd
         while still updating the block information after a different number of nonces,
         to increase the transparency of the process while still keeping the speed.
     """
+    logger.success("Started solving POW")
     if num_processes == None:
         num_processes = multiprocessing.cpu_count()
         
@@ -136,16 +141,12 @@ def solve_for_difficulty_fast( subtensor, wallet, num_processes: int = None, upd
     limit = int(math.pow(2,256)) - 1
     start_time = time.time()
 
-    console = bittensor.__console__
-    status = console.status("Solving")
-
     found_solution = multiprocessing.Value('q', -1, lock=False) # int
     best_raw = struct.pack("d", float('inf'))
     best = multiprocessing.Array(ctypes.c_char, best_raw, lock=True) # byte array to get around int size of ctypes
     best_seal = multiprocessing.Array('h', 32, lock=True) # short array should hold bytes (0, 256)
     
     with multiprocessing.Pool(processes=num_processes, initializer=initProcess_, initargs=(solve_, found_solution, best, best_seal)) as pool:
-        status.start()
         while found_solution.value == -1 and not wallet.is_registered(subtensor):
             iterable = [( nonce_start, 
                             nonce_start + update_interval , 
@@ -166,33 +167,16 @@ def solve_for_difficulty_fast( subtensor, wallet, num_processes: int = None, upd
                 block_hash = subtensor.substrate.get_block_hash( block_number)
             block_bytes = block_hash.encode('utf-8')[2:]
             with best_seal.get_lock():
-                message = f"""Solving 
-                    time spent: {time.time() - start_time}
-                    Nonce: [bold white]{nonce}[/bold white]
-                    Difficulty: [bold white]{difficulty}[/bold white]
-                    Iters: [bold white]{int(itrs_per_sec)}/s[/bold white]
-                    Block: [bold white]{block_number}[/bold white]
-                    Block_hash: [bold white]{block_hash.encode('utf-8')}[/bold white]
-                    Best: [bold white]{binascii.hexlify(bytes(best_seal) or bytes(0))}[/bold white]"""
-                status.update(message.replace(" ", ""))
-                filename = "pow{}{}.txt".format( wallet.name, wallet.hotkey_str )
-                dict_to_write = {
-                    "time spent": time.time() - start_time,
-                    "Nonce": nonce,
-                    "Difficulty": difficulty,
-                    "Iters": int(itrs_per_sec),
-                    "Block": block_number
-                }
-                with open(filename, 'w') as f:
-                    json.dump(dict_to_write, f)
-        
+                message = f"""UPDATE | time spent: {time.time() - start_time} Nonce: {nonce} Difficulty: {difficulty} Iters: {int(itrs_per_sec)} Block: {block_number} Block_hash: {block_hash.encode('utf-8')} Best: {binascii.hexlify(bytes(best_seal) or bytes(0))}"""
+                logger.info(message)
+
         # exited while, found_solution contains the nonce or wallet is registered
         if found_solution.value == -1: # didn't find solution
-            status.stop()
+            logger.success("Done solveing already registered")
             return None, None, None, None, None
         
         nonce, block_number, block_hash, difficulty, seal = result[ math.floor( (found_solution.value-old_nonce) / update_interval) ]
-        status.stop()
+        logger.success("Done solving solution found.")
         return nonce, block_number, block_hash, difficulty, seal
 
 def initProcess_(f, found_solution, best, best_seal):
@@ -241,3 +225,46 @@ def create_pow( subtensor, wallet ):
         'block_hash': block_hash, 
         'work': binascii.hexlify(seal)
     }
+
+def config():
+    parser = argparse.ArgumentParser(description='Solve for difficulty.')
+    bittensor.subtensor.add_args(parser)
+    bittensor.wallet.add_args(parser)
+    return bittensor.config(parser)
+
+def main(config):
+    logger.success("Started POW")
+    subtensor = bittensor.subtensor(config)
+    wallet = bittensor.wallet(config)
+    while True:
+        if wallet.is_registered( subtensor = subtensor ):
+            logger.info(f"{wallet.name} is registered to {subtensor.name}")
+        pow = create_pow( subtensor, wallet )
+        while pow['block_number'] >= subtensor.get_current_block() - 3:
+            with subtensor.substrate as substrate:
+                # create extrinsic call
+                call = substrate.compose_call( 
+                    call_module='SubtensorModule',  
+                    call_function='register', 
+                    call_params={ 
+                        'block_number': pow['block_number'], 
+                        'nonce': pow['nonce'], 
+                        'work': bittensor.utils.hex_bytes_to_u8_list( pow['work'] ), 
+                        'hotkey': wallet.hotkey.ss58_address, 
+                        'coldkey': wallet.coldkeypub.ss58_address
+                    } 
+                )
+                extrinsic = substrate.create_signed_extrinsic( call = call, keypair = wallet.hotkey )
+                response = substrate.submit_extrinsic( extrinsic, wait_for_inclusion=False, wait_for_finalization=True )
+                response.process_events()
+                if not response.is_success:
+                    logger.exception("Failed | error:{}".format(response.error_message))
+                    time.sleep(1)
+                    continue
+                else:
+                    logger.success("Registered")
+                    return True
+
+
+if __name__ == '__main__':
+    main(config())
