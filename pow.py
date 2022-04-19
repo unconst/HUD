@@ -238,7 +238,7 @@ def main(config):
     wallet = bittensor.wallet(config)
     while True:
         if wallet.is_registered( subtensor = subtensor ):
-            logger.info(f"{wallet.name} is registered to {subtensor.name}")
+            logger.info(f"{wallet.name} is registered to {subtensor.network}")
         pow = create_pow( subtensor, wallet )
         while pow['block_number'] >= subtensor.get_current_block() - 3:
             with subtensor.substrate as substrate:

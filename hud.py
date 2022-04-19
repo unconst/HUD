@@ -1,27 +1,27 @@
+from asyncio import futures
+from invoke import Result
 import digitalocean
-import paramiko
-import digitalocean
-import fabric
 import bittensor
+import paramiko
+import fabric
 import os
+from regex import R
 import yaml
 import json
-from typing import List, Optional
+from typing import Callable, List, Optional, Union, Tuple
 from fabric import Connection
 import pandas as pd
 
 import os
 import sys
+import re
 import time
 import random
 import threading
+import concurrent
 from bittensor._subtensor.subtensor_impl import Subtensor
 import yaml
 import bittensor
-import argparse
-from rich.console import Console
-from rich.table import Table
-from rich.prompt import Confirm
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 import utils
@@ -29,6 +29,8 @@ from rich import print
 from rich.console import Console
 from rich.table import Table
 from rich import pretty
+from tqdm import trange
+
 import patchwork.transfers
 pretty.install()
 
@@ -40,6 +42,8 @@ logger.add( sys.stdout, format="{level} {message}", level="INFO", colorize=True,
 
 DEBUG = False
 VERSION = "0.1.0"
+MAX_THREADS = 100000
+TIMEOUT = 30
 
 class Neuron:
     def __init__( self, name: str, sshkey:str, ip_address: str, wallet: 'bittensor.Wallet' ):
@@ -48,27 +52,47 @@ class Neuron:
         self.wallet = wallet
         self.ip_address = ip_address
         self._connection = None
-        try:
-            self.history = pd.read_csv( "history/{}.csv".format(self.name) )
-            self.history = self.history.set_index('datetime', drop = False)
-            self.history = self.history.sort_index(ascending=False)
-        except:
-            self.history = pd.DataFrame()
+        self.metadata = None 
 
     def __str__(self) -> str:
-        return "neuron({},{},{},{})".format( self.name, self.sshkey, self.ip_address, self.wallet)
+        return "N({})".format( self.name)
 
     def __repr__(self) -> str:
         return self.__str__()
 
+    def __hash__(self):
+        return hash(self.name)
+
+    def __lt__(self, other):
+        if self.wallet.name == other.wallet.name:
+            try:
+                me = int( re.findall(r'\d+', self.wallet.hotkey_str )[-1] )
+                them = int( re.findall(r'\d+', other.wallet.hotkey_str)[-1] )
+                return me < them
+            except Exception as e:
+                return self.wallet.hotkey_str < other.wallet.hotkey_str
+        else:
+            return self.wallet.name < other.wallet.name
+
+    def __eq__(self, other):
+        if isinstance(other, str):
+            return self.name == hash(other)
+        else:
+            return self.name == other.name
+
     @property
     def connection(self) -> Connection:
+
         if self._connection is None:
             key = paramiko.RSAKey.from_private_key_file( os.path.expanduser( self.sshkey ) )
-            self._connection = Connection( self.ip_address, user='root', connect_kwargs={ "pkey" : key })
+            self._connection = Connection( self.ip_address, user='root', connect_kwargs={ "pkey" : key } )
             return self._connection
         else:
             return self._connection
+
+    def reset_connection(self):
+        key = paramiko.RSAKey.from_private_key_file( os.path.expanduser( self.sshkey ) )
+        self._connection = Connection( self.ip_address, user='root', connect_kwargs={ "pkey" : key } )
 
     @property
     def can_connect( self ) -> bool:
@@ -77,198 +101,95 @@ class Neuron:
             return True
         except:
             return False
-    
-    def _check( self ):
-        if not self.can_connect:
-            raise Exception( "Can't connect to machine" )
-    
-    def run( self, cmd:str ):
-        if DEBUG:
-            print ( "{}| Running: {}".format(self.name, cmd) )
-        result = self.connection.run( cmd, warn = True, hide = not DEBUG)
-        return result
 
-    @property
-    def is_installed( self ) -> bool:
-        result = self.run( 'python3 -c "import bittensor"' )
-        return result.ok
+    def is_installed( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> bool:
+        return HUD(self).is_installed(warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    @retry(tries=3)
-    def get_neuron( self ) -> dict:
-        sub = bittensor.subtensor(network='nakamoto')
-        return sub.neuron_for_pubkey( ss58_hotkey = self.wallet.hotkey.ss58_address )
+    def is_registered( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> bool:
+        return HUD(self).is_registered(warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    @property
-    def neuron(self) -> 'bittensor.Neuron':
-        return self.get_neuron()
+    def is_running( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> bool:
+        return HUD(self).is_running(warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    @property
-    def is_registered( self ) -> bool:
-        neuron = self.get_neuron()
-        return not neuron.is_null
+    def get_metadata(self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> 'dict':
+        return HUD(self).get_network_metadata(warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    @property
-    def hotkey( self ) -> str:
-        result = self.run( "cat ~/.bittensor/wallets/{}/hotkeys/{}".format( self.wallet.name, self.wallet.hotkey_str )  )
-        if result.failed: return None
-        else: return json.loads(result.stdout)['ss58Address']
+    def get_hotkey( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> str:
+        return HUD(self).get_hotkey( warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    @property
-    def coldkey( self ) -> str:
-        result = self.run( "cat ~/.bittensor/wallets/{}/coldkeypub.txt".format( self.wallet.name ) )
-        if result.failed: return None
-        else: return json.loads(result.stdout)['ss58Address']
+    def get_coldkey( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> str:
+        return HUD(self).get_coldkey( warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    @property
-    def branch(self) -> str:
-        try:
-            result = self.run( 'cd ~/.bittensor/bittensor ; git branch --show-current' )
-            if result.failed: return None
-            else: return result.stdout.strip()
-        except:
-            return 'None'
+    def get_branch( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> str:
+        return HUD(self).get_branch(warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    @property
-    def is_running( self ) -> bool:
-        result = self.run( 'pm2 pid script')
-        if len(result.stdout) > 1: return True
-        else: return False  
+    def start( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> bool:
+        return HUD(self).start(warn = warn, hide = hide, disown = disown, timeout = timeout)
 
-    def pull(self):
-        self.run('rm -rf ~/HUD')
-        self.run('git clone --recurse-submodules https://github.com/unconst/HUD.git ~/HUD')
-    
-    def install(self):
-        self.run("sudo apt-get update && sudo apt-get install --no-install-recommends --no-install-suggests -y apt-utils curl git cmake build-essential gnupg lsb-release ca-certificates software-properties-common apt-transport-https")
-        self.run("sudo apt-get install --no-install-recommends --no-install-suggests -y python3")
-        self.run("sudo apt-get install --no-install-recommends --no-install-suggests -y python3-pip python3-dev python3-venv")
-        self.run("ulimit -n 50000 && sudo fallocate -l 20G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && sudo cp /etc/fstab /etc/fstab.bak")
-        self.run("sudo apt install npm -y")
-        self.run("sudo npm install pm2@latest -g")
-        self.run('mkdir -p ~/.bittensor/bittensor/')
-        self.run('rm -rf ~/.bittensor/bittensor')
-        self.run('git clone --recurse-submodules https://github.com/opentensor/bittensor.git ~/.bittensor/bittensor')
-        self.run('cd ~/.bittensor/bittensor ; pip3 install -e .')
-        self.run("sudo apt-get update && sudo apt install docker.io -y && rm /usr/bin/docker-compose || true && curl -L https://github.com/docker/compose/releases/download/1.29.2/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose && sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose  && rm -rf subtensor || true && git clone https://github.com/opentensor/subtensor.git && cd subtensor && docker-compose up -d")
-    
-    def checkout_branch(self, branch):
-        if "tags/" in branch:
-            branch_str = "%s -b tag-%s" % (branch, branch.split("/")[1])
-        else:
-            branch_str = branch
-        self.run( 'cd ~/.bittensor/bittensor ; git checkout %s' % branch_str )
+    def get_logs( self, lines:int = 5, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ):
+        return HUD(self).get_logs(lines = lines, warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    def pm2_show_script( self ):
-        print( self.run( "pm2 show script" ) )
+    def get_cpu_usage( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT):
+        return HUD(self).get_cpu_usage( warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
+        #result = self.run( "top -bn1 | grep load | awk '{printf \"CPU: %.2f\", $(NF-2)}'" )
+        #return result.stdout
 
-    def pm2_describe_script( self ):
-        print( self.run( "pm2 describe script" ) )
+    def clear_cache( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT):
+        return HUD(self).clear_cache( warn = warn, hide = hide, disown = disown, timeout = timeout )[self]
+        #self.run( "rm -rf ~/.bittensor/miners && rm -rf /root/.pm2/logs/" )
 
-    # write a function that returns the last n lines of the file /root/.pm2/logs/script-out.log on the machine
-    def get_logs( self, lines:int ):
-        result = self.run( "tail -n {} /root/.pm2/logs/script-out.log".format( lines ) )
-        return result.stdout
+    def reboot( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT):
+        return HUD(self).reboot( warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    def clear_cache( self ):
-        self.run( "rm -rf ~/.bittensor/miners && rm -rf /root/.pm2/logs/" )
+    def pull(self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT):
+        return HUD(self).pull( warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    def reboot( self ):
-        self.run( "sudo shutdown -r now -f")
+    def install(self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT):
+        return HUD(self).install( warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    # write a function that returns the CPU usage of the machine
-    def get_cpu_usage( self ):
-        result = self.run( "top -bn1 | grep load | awk '{printf \"CPU: %.2f\", $(NF-2)}'" )
-        return result.stdout
+    def checkout_branch(self, branch, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT):
+        return HUD(self).checkout( branch = branch, warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    # write a function that returns all running procesess on the machine
-    def get_running_procs(self):
-        result = self.run( "ps aux" )
-        return result.stdout
+    def pm2_show_script( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT):
+        return HUD(self).pm2_show_script( warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
-    def load_wallet( self ):
-        self.run( "mkdir -p ~/.bittensor/wallets/{}/hotkeys".format( self.wallet.name ) ) 
-        self.run( "echo '{}' > ~/.bittensor/wallets/{}/hotkeys/{}".format( open(self.wallet.hotkey_file.path, 'r').read(), self.wallet.name, self.wallet.hotkey_str ) )
-        self.run( "echo '{}' > ~/.bittensor/wallets/{}/coldkeypub.txt".format( open(self.wallet.coldkeypub_file.path, 'r').read(), self.wallet.name ) )
-
-    def add_wallet( self, wallet: bittensor.Wallet ):
-        self.run( "mkdir -p ~/.bittensor/wallets/{}/hotkeys".format( wallet.name ) ) 
-        self.run( "echo '{}' > ~/.bittensor/wallets/{}/hotkeys/{}".format( open(wallet.hotkey_file.path, 'r').read(), wallet.name, wallet.hotkey_str ) )
-        self.run( "echo '{}' > ~/.bittensor/wallets/{}/coldkeypub.txt".format( open(wallet.coldkeypub_file.path, 'r').read(), wallet.name ) )
-
-    def register( 
-            self, 
-            wallet: 'bittensor.Wallet' 
-        ):
-        self.add_wallet( wallet )
-        self.connection.run(
-            "pm2 start ~/.bittensor/bittensor/bin/btcli --name register_{}_{} --interpreter python3 -- register --wallet.name {} --wallet.hotkey {} --no_prompt".format( wallet.name, wallet.hotkey_str, wallet.name, wallet.hotkey_str ), 
-            warn=False, 
-            hide=not DEBUG, 
-            disown = False, 
-        )
+    def pm2_describe_script( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT):
+        return HUD(self).pm2_describe_script( warn = warn, hide = hide, disown = disown, timeout = timeout)[self]
 
     def subtensor_best(self) -> int:
         sublogs = self.run( 'docker logs node-subtensor --tail 100').stderr
         idx = int(sublogs.rfind("best: #"))
         return int( sublogs[idx + 7: idx + 14] )
 
-    def kill_register( self, wallet: 'bittensor.Wallet' ):
-        self.connection.run(
-            "pm2 delete register_{}_{}".format( wallet.name, wallet.hotkey_str ), 
-            warn=False, 
-            hide=not DEBUG, 
-            disown = False, 
-        )
 
-    def kill_old_register( self, wallet: 'bittensor.Wallet' ):
-        self.run( "pm2 delete registration")
+class HUDDict(dict):
+    def __init__(self,*args,**kwargs) : dict.__init__(self,*args,**kwargs) 
+    def __getitem__(self, key):
+        if isinstance(key, HUD):
+            return super().__getitem__(key.item())
+        elif isinstance(key, Neuron):
+            return super().__getitem__(key)
+        elif isinstance(key, str):
+            for k,v in self.items():
+                if k.name == key:
+                    return v
+            raise KeyError(key)
 
-    def stats(self, forced:bool = False, refresh_secs: int = 60 * 20) -> dict:
-        seconds_since_epoch = int( time.time() )
-        if len(list(self.history.index)) != 0:
-            latest_time = self.history.index.max()
-            if seconds_since_epoch - latest_time < refresh_secs and not forced:
-                return self.history.loc[latest_time]
-        neuron = self.get_neuron()
-        stats = {
-            'version': VERSION,
-            'datetime': int( seconds_since_epoch ),
-            'name': self.name,
-            'ip_address': self.ip_address,
-            'sshkey': self.sshkey,
-            'can_connect': self.can_connect,
-            'branch': self.branch,
-            'is_installed': self.is_installed,
-            'is_running': self.is_running,
-            'is_registered': not neuron.is_null,
-            'uid': neuron.uid,
-            'stake': neuron.stake,
-            'rank': neuron.rank,
-            'trust': neuron.trust,
-            'consensus': neuron.consensus,
-            'incentive': neuron.incentive,
-            'dividends': neuron.dividends,
-            'emission': neuron.emission,
-            'last_update': neuron.last_update,
-            'active': neuron.active,
-            'cpu_usage': self.get_cpu_usage(),
-            'hotkey': self.hotkey,
-            'coldkey': self.coldkey
-        }
-        if self.history.empty:
-            self.history = pd.DataFrame( [stats], index = [stats['datetime']], columns=stats.keys() )
-            self.history = self.history.sort_index(ascending=False)
-            self.history = self.history.set_index('datetime', drop = False)
+class HUD(list):
+    max_threads = 10000
+
+    def __init__(self, neurons: Union[ Neuron, List[Neuron], 'HUD' ] = []):
+        if isinstance( neurons, HUD ):
+            self.values = neurons.values
+        elif isinstance( neurons, Neuron ):
+            self.values = [ neurons ]
         else:
-            self.history.loc[seconds_since_epoch] = stats
-        self.history = self.history.loc[:, ~self.history.columns.str.contains('^Unnamed')]
-        self.history.to_csv( "history/{}.csv".format(self.name), index=False)
-        self.history = self.history.sort_index(ascending=False)
-        self.history = self.history.set_index('datetime', drop = False)
-        return self.history.loc[seconds_since_epoch]
-
-
-class HUD:
+            self.values = neurons
+        self.values = sorted(self.values)
+        super(HUD, self).__init__( self.values )
+        self.ndict = {}
+        for n in self.values:
+            self.ndict[n.name] = n
 
     def debug():
         global DEBUG
@@ -277,16 +198,365 @@ class HUD:
     def set_debug(debug):
         global DEBUG
         DEBUG = debug
+
+    def __getitem__(self, idx ):
+        if isinstance( idx, str ):
+            return HUD( self.ndict[idx] )
+        return HUD( self.values[ idx ] )
+
+    def __setitem__(self, idx, value):
+        if isinstance( value, HUD ):
+            self.values[idx] = value.values
+        else:
+            self.values[idx] = value
+
+    def append(self, item):
+        self.values.append( self.item )
+
+    def extend(self, t):
+        self.values.extend( t )
+
+    def item(self):
+        if len(self) == 1:
+            return self.values[0]
+
+    def get(self, *args):
+        nn = []
+        for v in args:
+            if isinstance(v, list):
+                nn = nn + v
+            else:
+                nn.append(v)
+        return HUD( [ self.ndict[n] for n in nn] )
+
+    def start(
+            self, 
+            script: str = "~/.bittensor/bittensor/bittensor/_neuron/text/advanced_server/main.py", 
+            args: str = "--logging.debug --neuron.blacklist.stake.backward 1000 --neuron.blacklist.stake.forward 1000 --subtensor.network nakamoto neuron.model_name distilgpt2", 
+            disown: bool = False, 
+            hide:bool = not DEBUG,
+            warn:bool = False, 
+            max_threads: int = MAX_THREADS, 
+            timeout: int = TIMEOUT, 
+            stdout:bool = True 
+        ) -> HUDDict[Neuron, bool]:
+        return HUD._start( neurons = self.values, script = script, args = args, warn = warn, hide = hide, disown = disown, max_threads = max_threads, timeout = timeout, stdout = stdout )
+
+    def _start(
+            neurons: Union[ List[Neuron], 'HUD' ],
+            script: str = "~/.bittensor/bittensor/bittensor/_neuron/text/advanced_server/main.py", 
+            args: str = "--logging.debug --neuron.blacklist.stake.backward 1000 --neuron.blacklist.stake.forward 1000 --subtensor.network nakamoto neuron.model_name distilgpt2", 
+            disown: bool = False, 
+            hide:bool = not DEBUG,
+            warn:bool = False, 
+            max_threads: int = MAX_THREADS, 
+            timeout: int = TIMEOUT, 
+            stdout:bool = True
+        ) -> HUDDict[Neuron, bool]:
+        for n in tqdm(neurons):
+            delete_script = "pm2 delete script"
+            try:
+                n.connection.run( delete_script, warn = warn, hide = hide, disown = disown, timeout = timeout)
+            except:
+                pass
+            neuron_script = "pm2 start {} -f --name script --interpreter python3 -- {} {}".format(script, args, "--wallet.name {} --wallet.hotkey {}".format(n.wallet.name, n.wallet.hotkey_str))
+            n.connection.run( neuron_script, warn = warn, hide = hide, disown = disown, timeout = timeout)
+        HUD._is_running( neurons, disown = disown, warn = warn, hide = hide )
+
+    def stop(
+            self, 
+            disown: bool = False, 
+            hide:bool = not DEBUG,
+            warn:bool = False, 
+            max_threads: int = MAX_THREADS, timeout: int = TIMEOUT, 
+            stdout:bool = True 
+        ) -> HUDDict[Neuron, bool]:
+        return HUD._stop( neurons = self.values, warn = warn, hide = hide, disown = disown, max_threads = max_threads, timeout = timeout, stdout = stdout )
+
+    def _stop(
+            neurons: Union[ List[Neuron], 'HUD' ],
+            disown: bool = False, 
+            hide:bool = not DEBUG,
+            warn:bool = False, 
+            max_threads: int = MAX_THREADS, 
+            timeout: int = TIMEOUT, 
+            stdout:bool = True
+        ) -> HUDDict[Neuron, bool]:
+        for n in tqdm(neurons):
+            delete_script = "pm2 delete script"
+            try:
+                n.connection.run( delete_script, warn = warn, hide = hide, disown = disown, timeout = timeout)
+            except:
+                pass
+        HUD._is_running( neurons, disown = disown, warn = warn, hide = hide, timeout = timeout)
+    
+    def run(self, script: Union[str, Callable], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT, stdout:bool = True ) -> HUDDict[Union[List[str], List[fabric.Result]]]:
+        return HUD._run( neurons = self.values, script = script, warn = warn, hide = hide, disown = disown, max_threads = max_threads, timeout = timeout, stdout = stdout )
+
+    @staticmethod
+    def _run( neurons: Union[ List[Neuron], 'HUD' ], script: Union[str, Callable], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT, stdout:bool = True, is_ok:bool = False) -> HUDDict[Union[List[str], List[fabric.Result]]]:
+        neurons = neurons if isinstance(neurons, list) else HUD(neurons)
+        if len(neurons) == 0: return {}
+        if isinstance(neurons, Neuron): neurons = [neurons]
+        is_script = isinstance(script, str)
+        results = HUDDict()
+        tbar = trange(len(neurons), desc="Running: {}".format(script), leave=True)
+        def _run( n ):
+            if not hide: logger.info( 'Running | {} | warn:{}, hide:{}, disown:{}, timeout {}, script:{} '.format( n.name, warn, hide, disown, script, timeout) )
+            if not n.can_connect: n.reset_connection()
+            try:
+                if is_script:
+                    r = n.connection.run( script, warn = warn, hide = hide, disown = disown, timeout = timeout )
+                    tbar.update(1)
+                    return r.stdout.strip() if stdout else r.ok if is_ok else r
+                else:
+                    tbar.update(1)
+                    return script( neuron = n, disown = disown, hide = hide, warn = warn, timeout = timeout)
+            except Exception as e:
+                if warn or not hide: logger.warning( 'Error | {} | error:{}'.format( n.name, e ) )
+                tbar.update(1)
+                result = fabric.Result(connection = n.connection)
+                result.stdout = str(e)
+                result.stderr = str(e)
+                return result.stdout.strip() if stdout or not is_script else False if is_ok else result
+        futs = []
+        with ThreadPoolExecutor(max_workers=min(max_threads, len(neurons))) as executor:
+            for n in neurons:
+                futs.append( (n, executor.submit(_run, n)) )
+        results = HUDDict()
+        for n, fut in futs:
+            try:
+                results[n] = fut.result(timeout = timeout)
+            except concurrent.futures.TimeoutError:
+                results[n] = "Timeout"            
+        return results
+
+    def iters( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, dict[str, int]]:
+        return HUD._iters( self.values, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout)
+
+    @staticmethod
+    def _iters( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, dict[str, int]]:
+        neurons = neurons if isinstance(neurons, list) else HUD(neurons)
+        def get_total_iters( neuron:Neuron, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, timeout: int = TIMEOUT ) -> int:
+            result = {}
+            try:
+                pow_files = neuron.connection.run( "find | grep pow_", disown = disown, hide = hide, warn = warn, timeout = timeout).stdout.strip().split("\n")
+            except:
+                return HUDDict()
+            for filename in pow_files:
+                name = filename.split("_c")[1].split("_h")[0] + "-" + filename.split("_h")[1].split(".out")[0]
+                if name not in result: result[name] = 0
+                out = neuron.connection.run( "tail -n 1 {}".format(filename), disown = disown, hide = hide, warn = warn, timeout = timeout ).stdout
+                try:
+                    iters = out.rfind("Iters"); block = out.rfind("Block:")
+                    niters = int( out[iters+6:block-1] )
+                    result[name] += niters
+                except:
+                    pass
+            return result
+        return HUD._run( neurons, script = get_total_iters, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    def get_network_metadata( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, dict]:
+        return HUD._get_network_metadata( self.values, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _get_network_metadata( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, dict]:
+        neurons = neurons if isinstance(neurons, list) else HUD(neurons)
+        def __get_network_metadata( neuron:Neuron, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, timeout: int = TIMEOUT ) -> int:
+            sub = bittensor.subtensor(network = 'nakamoto')
+            metadata = sub.neuron_for_pubkey( ss58_hotkey = neuron.wallet.hotkey.ss58_address )
+            neuron.metadata = metadata
+            return metadata
+        return HUD._run( neurons, script = __get_network_metadata, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout  )
+
+    def is_registered( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        return HUD._is_registered( self.values, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _is_registered( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        neurons = neurons if isinstance(neurons, list) else HUD(neurons)
+        def __get_is_registered( neuron:Neuron, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, timeout: int = TIMEOUT) -> bool:
+            sub = bittensor.subtensor(network = "nakamoto") 
+            uid = sub.substrate.query( module='SubtensorModule',  storage_function='Hotkeys', params = [ neuron.wallet.hotkey.ss58_address ] ).value
+            if uid == 0:
+                return False
+            else:
+                return True
+        return HUD._run( neurons, script = __get_is_registered, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+    
+    def query( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        return HUD._query( self.values, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _query( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        bittensor.logging(debug=not hide)
+        neurons = HUD(neurons)
+        def _do_query( neuron:Neuron, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, timeout: int = TIMEOUT) -> bool:
+            wallet = bittensor.wallet( name = "const", hotkey = "Nero" )
+            dend = bittensor.dendrite( wallet = wallet )
+            endpoint = bittensor.endpoint( version=bittensor.__version_as_int__, uid = 9, hotkey=neuron.wallet.hotkey.ss58_address, ip=neuron.ip_address, ip_type=4, port=bittensor.defaults.axon.port, modality=0, coldkey=neuron.wallet.coldkeypub.ss58_address)
+            logger.info( 'Querying | {} | wallet:{}, dend:{}, endpoint:{} '.format( neuron, wallet, dend, endpoint ) )
+            return dend.forward_text( endpoints=endpoint, inputs="query")
+        bittensor.logging(debug=False)
+        return HUD._run( neurons, script = _do_query, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    def can_connect( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, str]:
+        return HUD._can_connect( self.values, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _can_connect( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, str]:
+        return HUD._run( neurons, script = "", disown = disown, hide = hide, warn = warn, max_threads = max_threads, stdout = False, is_ok = True)
+
+    def reconnect( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, str]:
+        return HUD._reconnect( self.values, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _reconnect( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, str]:
+        def ___reconnect( neuron:Neuron, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, timeout: int = TIMEOUT) -> bool:
+            neuron.reset_connection()
+            return neuron.can_connect
+        return HUD._run( neurons, script = ___reconnect, disown = disown, hide = hide, warn = warn, max_threads = max_threads )
+
+    def get_branch( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, str]:
+        return HUD._get_branch( self.values, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _get_branch( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, str]:
+        return HUD._run( neurons, script = "cd ~/.bittensor/bittensor ; git branch --show-current", disown = disown, hide = hide, warn = warn, max_threads = max_threads, stdout=True )
+
+    def load_wallet( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        return HUD._load_wallet( self, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _load_wallet( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        neurons = HUD(neurons)
+        def ___load_wallet( neuron:Neuron, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, timeout: int = TIMEOUT) -> bool:
+            neuron.connection.run( "mkdir -p ~/.bittensor/wallets/{}/hotkeys".format( neuron.wallet.name ), warn = warn, hide = hide, disown = disown, timeout = timeout)
+            neuron.connection.run( "echo '{}' > ~/.bittensor/wallets/{}/hotkeys/{}".format( open(neuron.wallet.hotkey_file.path, 'r').read(), neuron.wallet.name, neuron.wallet.hotkey_str ), warn = warn, hide = hide, disown = disown, timeout = timeout)
+            neuron.connection.run( "echo '{}' > ~/.bittensor/wallets/{}/coldkeypub.txt".format( open(neuron.wallet.coldkeypub_file.path, 'r').read(), neuron.wallet.name ), warn = warn, hide = hide, disown = disown, timeout = timeout)
+            return True
+        return HUD._run( neurons, script = ___load_wallet, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    def get_hotkey( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        return HUD._get_hotkey( self, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _get_hotkey( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        neurons = HUD(neurons)
+        def ___get_hotkey( neuron:Neuron, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, timeout: int = TIMEOUT) -> bool:
+            result = neuron.connection.run( "cat ~/.bittensor/wallets/{}/hotkeys/{}".format( neuron.wallet.name, neuron.wallet.hotkey_str ), warn = warn, hide = hide, disown = disown, timeout = timeout)
+            if result.failed: return None
+            else: return json.loads(result.stdout)['ss58Address']
+        return HUD._run( neurons, script = ___get_hotkey, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    def get_coldkey( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        return HUD._get_coldkey( self, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _get_coldkey( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        neurons = HUD(neurons)
+        def ___get_coldkey( neuron:Neuron, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, timeout: int = TIMEOUT) -> bool:
+            result = neuron.connection.run( "cat ~/.bittensor/wallets/{}/coldkeypub.txt".format( neuron.wallet.name ), warn = warn, hide = hide, disown = disown, timeout = timeout)
+            if result.failed: return None
+            else: return json.loads(result.stdout)['ss58Address']
+        return HUD._run( neurons, script = ___get_coldkey, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    def install( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, reinstall: bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        return HUD._install( self, disown = disown, hide = hide, warn = warn, reinstall = reinstall, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _install( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, reinstall: bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        neurons = HUD(neurons)
+        if not reinstall:
+            neurons = HUD( [n for n, is_installed in neurons.is_installed().items() if not is_installed] )
+        HUD._run( neurons, script = "sudo apt-get update && sudo apt-get install --no-install-recommends --no-install-suggests -y apt-utils curl git cmake build-essential gnupg lsb-release ca-certificates software-properties-common apt-transport-https", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "sudo apt-get install --no-install-recommends --no-install-suggests -y python3", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "sudo apt-get install --no-install-recommends --no-install-suggests -y python3-pip python3-dev python3-venv", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "ulimit -n 500000000 && sudo fallocate -l 20G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && sudo cp /etc/fstab /etc/fstab.bak", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "sudo apt install npm -y", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "sudo npm install pm2@latest -g", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "mkdir -p ~/.bittensor/bittensor/", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "rm -rf ~/.bittensor/bittensor", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "git clone --recurse-submodules https://github.com/opentensor/bittensor.git ~/.bittensor/bittensor", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "cd ~/.bittensor/bittensor ; pip3 install -e .", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._load_wallet( neurons, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._pull( neurons, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "sudo apt-get update && sudo apt install docker.io -y && rm /usr/bin/docker-compose || true && curl -L https://github.com/docker/compose/releases/download/1.29.2/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose && sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose  && rm -rf subtensor || true && git clone https://github.com/opentensor/subtensor.git && cd subtensor && docker-compose up -d", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        return HUD._is_installed( neurons, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    def is_installed( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        return HUD._is_installed(self.values, disown, hide, warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _is_installed( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        neurons = HUD(neurons)
+        results = HUD._run( neurons, script = "python3 -c 'import bittensor'", disown=disown, hide=hide, warn=warn, stdout=False, max_threads = max_threads, timeout = timeout )
+        for key in results:
+            if "ModuleNotFoundError" in results[key].stdout:
+                results[key] = False
+            else:
+                results[key] = True
+        return results
+
+    def is_running( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        return HUD._is_running(self.values, disown, hide, warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _is_running( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
+        neurons = HUD(neurons)
+        results = HUD._run( neurons, script = "pm2 pid script", disown=disown, hide=hide, warn=warn, stdout=False, max_threads = max_threads, timeout = timeout )
+        for key in results:
+            try:
+                if int(results[key].stdout) > 1:
+                    results[key] = True
+                else:
+                    results[key] = False
+            except:
+                results[key] = False
+        return results
+
+    def pull( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, fabric.Result]:
+        return HUD._pull(self.values, disown, hide, warn, max_threads = max_threads, timeout = timeout )
     
     @staticmethod
-    def append_to_config( neurons: list['Neuron'] ):
-        config = {}
-        for n in neurons:
-            if n.wallet.name not in config:
-                config[n.wallet.name] = {}
-            config[ n.wallet.name ][ n.wallet.hotkey_str ] = {  'sshkey': str(n.sshkey), 'ip_address': str(n.ip_address) }
-        with open( 'config.yaml', 'a' ) as f:
-            yaml.dump( config, f, default_flow_style=False )
+    def _pull( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, fabric.Result]:
+        neurons = neurons if isinstance(neurons, list) else HUD(neurons)
+        return HUD._run( neurons, script = "rm -rf ~/HUD && git clone --recurse-submodules https://github.com/unconst/HUD.git ~/HUD", disown=disown, hide=hide, warn=warn, max_threads = max_threads, timeout = timeout, stdout=False )
+
+    def get_logs( self, lines:int = 5, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, str]:
+        return HUD._get_logs(self.values, lines = lines, disown=disown, hide=hide, warn=warn, max_threads = max_threads, timeout = timeout )
+    
+    @staticmethod
+    def _get_logs( neurons: Union[ List[Neuron], 'HUD' ], lines:int = 5, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, str]:
+        neurons = HUD(neurons)
+        return HUD._run( neurons, script = "tail -n {} /root/.pm2/logs/script-out.log".format( lines ), disown=disown, hide=hide, warn=warn, stdout=True )
+
+    def pow( self, targets: Union[ Neuron, List[Neuron], 'HUD' ], pow_key: int = int(time.time()), n_procs: int = 1, network:str = "nakamoto", disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> None:
+        return HUD._pow( self.values, targets = targets, n_procs = n_procs, network = network, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
+    @staticmethod
+    def _pow( workers: Union[ List[Neuron], 'HUD' ], targets: Union[ Neuron, List[Neuron], 'HUD' ], n_procs: int = 1, network:str = "nakamoto", disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT):
+        workers = HUD(workers)
+        targets = HUD(targets)
+        logger.info( "Starting PoW | targets:{} workers: {}".format( targets, workers ) )
+        for target, is_registered in targets.is_registered().items():
+            if not is_registered:
+                HUD._run( workers, script = "pkill -f **h{}** & rm **h{}**".format( target.wallet.hotkey_str, target.wallet.hotkey_str ), disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+                HUD._run( workers, script = "mkdir -p ~/.bittensor/wallets/{}/hotkeys".format( target.wallet.name ), disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+                HUD._run( workers, script = "echo '{}' > ~/.bittensor/wallets/{}/hotkeys/{}".format( open(target.wallet.hotkey_file.path, 'r').read(), target.wallet.name, target.wallet.hotkey_str ), disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+                HUD._run( workers, script = "echo '{}' > ~/.bittensor/wallets/{}/coldkeypub.txt".format( open(target.wallet.coldkeypub_file.path, 'r').read(), target.wallet.name ), disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+                for i in range(n_procs):
+                    HUD._run( workers, script = "nohup python3 HUD/pow.py --subtensor.network {} --wallet.name {} --wallet.hotkey {} > pow_{}_c{}_h{}.out &".format(network, target.wallet.name, target.wallet.hotkey_str, i, target.wallet.name, target.wallet.hotkey_str), disown = True, hide = True, warn = False, max_threads = max_threads, timeout = timeout )
+
+    def kill_pow( self, targets:Optional[Union[ Neuron, List[Neuron], 'HUD' ]] = None, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> None:
+        if targets != None:
+            targets = HUD(targets)
+            for tar in targets:
+                logger.info( "Killing PoW | target:{} ".format( tar ) )
+                HUD._run( self.values, script = "pkill -f **h{}** & rm **h{}**".format( tar.wallet.hotkey_str, tar.wallet.hotkey_str ), disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        else:
+            HUD._run( self.values, script = "pkill -f pow.py & rm  pow_*", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+
 
     @staticmethod
     def write_to_config( neurons: list['Neuron'] ):
@@ -294,12 +564,14 @@ class HUD:
         for n in neurons:
             if n.wallet.name not in config:
                 config[n.wallet.name] = {}
-            config[ n.wallet.name ][ n.wallet.hotkey_str ] = {  'sshkey': str(n.sshkey), 'ip_address': str(n.ip_address) }
-        with open( 'config.yaml', 'w' ) as f:
-            yaml.dump( config, f, default_flow_style=False )
+                config[n.wallet.name][n.wallet.name] = {}
+            config[ n.wallet.name ][ n.wallet.name ][ n.wallet.hotkey_str ] = {  'sshkey': str(n.sshkey), 'ip_address': str(n.ip_address) }
+        for project in config.keys():
+            with open( 'configs/{}.yaml'.format(project), 'w' ) as f:
+                yaml.dump( config[project], f, default_flow_style=False )
 
     @staticmethod
-    def load_from_digital_ocean( tag:str = None ) -> list['Neuron']:
+    def load_from_digital_ocean( tag:str = None ) -> 'HUD[Neuron]':
         manager = digitalocean.Manager( token = os.getenv( 'MARIUS_DOTOKEN' ))
         if tag is None:
             droplets = manager.get_all_droplets()
@@ -318,219 +590,20 @@ class HUD:
                 ) ) 
             except:
                 pass
-        return neurons
+        return HUD( neurons )
 
     @staticmethod
-    def load_all_from_config( tag: str = None ) -> dict[list['Neuron']]:
-        with open( 'config.yaml', "r") as config_file:
+    def load_from_config( project ) -> 'HUD[Neuron]':
+        with open( 'configs/{}.yaml'.format( project ), "r") as config_file:
             config = yaml.safe_load(config_file)
+        config = bittensor.Config.fromDict(config)[project]
         neurons = []
-        if tag == None:
-            config = bittensor.Config.fromDict(config)
-            for coldkey in config:
-                for hotkey in config[coldkey]:
-                    name = "{}-{}".format( coldkey, hotkey )
-                    neurons.append( Neuron(
-                        name = name,
-                        sshkey = config[coldkey][hotkey]['sshkey'],
-                        ip_address = config[coldkey][hotkey]['ip_address'],
-                        wallet = bittensor.wallet( name = coldkey, hotkey=hotkey)
-                    ))
-        else:
-            config = bittensor.Config.fromDict(config)[tag]
-            for hotkey in config:
-                name = "{}-{}".format( tag, hotkey )
-                neurons.append( Neuron(
-                    name = name,
-                    sshkey = config[hotkey]['sshkey'],
-                    ip_address = config[hotkey]['ip_address'],
-                    wallet = bittensor.wallet( name = tag, hotkey=hotkey)
-                ))
-        return neurons
-
-
-    @staticmethod
-    def pull( neurons: List[Neuron], disown: bool = False, hide:bool = not DEBUG, warn:bool = False):
-        return HUD.run( neurons, script = "rm -rf ~/HUD && git clone --recurse-submodules https://github.com/unconst/HUD.git ~/HUD", disown=disown, hide=hide, warn=warn )
-
-    @staticmethod
-    def run( neurons: Optional[List[Neuron]], script:str, disown: bool = False, hide:bool = not DEBUG, warn:bool = False) -> List[str]:
-        if isinstance(neurons, Neuron):
-            neurons = [neurons]
-        results = {}
-        def _run(n):
-            if not hide: logger.info( 'Running | {} | warn:{}, hide:{}, disown:{}, script:{} '.format( n.name, warn, hide, disown, script ) )
-            try:
-                result = n.connection.run(
-                    script, 
-                    warn = warn, 
-                    hide = hide, 
-                    disown = disown, 
-                )
-                results[n.name] = result
-            except Exception as e:
-                if warn or not hide: logger.warning( 'Error | {} | error:{}'.format( n.name, e ) )
-
-        with ThreadPoolExecutor(max_workers=len(neurons)) as executor:
-            for n in tqdm( neurons ):
-                executor.submit(_run, n)
-        return results
-
-
-    @staticmethod
-    def register( workers, neuron, timeout, network:str = "nakamoto") -> bool:
-        HUD.run( workers, script = "mkdir -p ~/.bittensor/wallets/{}/hotkeys".format( neuron.wallet.name ), disown = False, hide = False, warn = True )
-        HUD.run( workers, script = "echo '{}' > ~/.bittensor/wallets/{}/hotkeys/{}".format( open(neuron.wallet.hotkey_file.path, 'r').read(), neuron.wallet.name, neuron.wallet.hotkey_str ), disown = False, hide = False, warn = True )
-        HUD.run( workers, script = "echo '{}' > ~/.bittensor/wallets/{}/coldkeypub.txt".format( open(neuron.wallet.coldkeypub_file.path, 'r').read(), neuron.wallet.name ), disown = False, hide = False, warn = True )
-        HUD.run( workers, script = "pkill -f pow.py", disown = False, hide = False, warn = True )
-        HUD.run( workers, script = "nohup python3 pow.py --subtensor.network {} --wallet.name {} --wallet.hotkey {} > pow_{}_{}.out 2>&1".format(network, neuron.wallet.name, neuron.wallet.hotkey_str, neuron.wallet.name, neuron.wallet.hotkey_str), disown = False, hide = False, warn = True )
-
-
-        def _kill_register(worker):
-            logger.info( 'Killing | {} '.format( worker.name ) )
-            worker.kill_register( neuron.wallet )
-        with ThreadPoolExecutor(max_workers=len(workers)) as executor:
-            for worker in workers:
-                executor.submit(_kill_register, worker)
-        def _register(worker):
-            logger.info( 'Killing | {} '.format( worker.name ) )
-            worker.register( neuron.wallet )
-        with ThreadPoolExecutor(max_workers=len(workers)) as executor:
-            for worker in workers:
-                executor.submit(_register, worker)
-        print ('Registrations sumbitted')
-        inc = 5
-        n_blocks = int( timeout / inc )
-        blocks = list(range(n_blocks))
-        for b in tqdm(blocks):
-            try:
-                meta = neuron.get_neuron()
-                if not meta.is_null:
-                    print ('Registered :)')
-                    return True
-            except Exception as e:
-                print ( '{}'.format(e) )
-            time.sleep(inc)
-        def _kill_register(worker):
-            worker.kill_register( neuron.wallet )
-        with ThreadPoolExecutor(max_workers=len(workers)) as executor:
-            for worker in workers:
-                print ('Killing: {} --> {}'.format(neuron.wallet, worker ))
-                executor.submit(_kill_register, worker)
-        print ('Failed to register :( ')
-        return False
-
-
-
-    @staticmethod
-    def status(neurons:dict['Neuron'], forced:bool = False, refresh_secs: int = 60 * 20) -> dict:
-        if isinstance(neurons, Neuron):
-            neurons = [neurons]
-        def get_stats(neuron):
-            try:
-                return neuron.stats(forced = forced, refresh_secs = refresh_secs)
-            except:
-                return 
-
-        def get_pandas(list_neurons):
-            stats = []
-            with ThreadPoolExecutor(max_workers=len(list_neurons)) as executor:
-                stats = list(tqdm(executor.map(get_stats, list_neurons), total=len(list_neurons)))
-            return pd.DataFrame( stats, columns=stats[0].keys() )
-        if isinstance( neurons, list):
-            return get_pandas( neurons )
-        else:
-            result = []
-            for key in neurons.keys():
-                result.append( get_pandas( neurons[key] ))
-            return pd.concat( result, axis=0 )
-
-    @staticmethod
-    def rich_row( stats ) -> str:
-        name_str = '[bold green]' + stats['name']
-        ip_address_str = '[bold green]' + stats['ip_address']
-        sshkey_str = '[bold green]' + stats['sshkey']
-        hotkey_str =  '[bold green]' + stats['hotkey']
-        coldkey_str =  '[bold green]' + stats['coldkey']
-        branch_str = '[bold yellow] Yes' + stats['branch']
-        can_connect_str = '[bold green] Yes' if stats['can_connect'] else '[bold red] No'
-        is_installed_str = '[bold green] Yes' if stats['is_installed'] else '[bold red] No'
-        is_running_str = '[bold green] Yes' if stats['is_running'] else '[bold red] No'
-        is_registered_str = '[bold green] Yes' if stats['is_registered'] else '[bold red] No'
-        metrics = [
-            str( stats['uid'] ), 
-            '{:.5f}'.format( stats['stake']),
-            '{:.5f}'.format(  stats['rank']), 
-            '{:.5f}'.format(  stats['trust']), 
-            '{:.5f}'.format(  stats['consensus']), 
-            '{:.5f}'.format(  stats['incentive']),
-            '{:.5f}'.format(  stats['dividends']),
-            '{:.5f}'.format(  stats['emission']),
-            str( stats['last_update']),
-            str( stats['active'] ), 
-        ]
-        return [ name_str, ip_address_str, sshkey_str, can_connect_str, branch_str, is_installed_str, is_running_str, is_registered_str] + metrics + [ coldkey_str, hotkey_str ]  
-
-    @staticmethod
-    def table( neurons:list['Neuron'] ):
-
-        def get_stats(neuron):
-            return neuron.stats()
-
-        stats = []
-        with ThreadPoolExecutor(max_workers=len(neurons)) as executor:
-            stats = list(tqdm(executor.map(get_stats, neurons), total=len(neurons)))
-
-        total_stake = 0
-        total_rank = 0
-        total_trust = 0
-        total_dividends = 0
-        total_consensus = 0
-        total_emission = 0
-        total_incentive = 0
-        for s in stats:
-            total_stake += s['stake']
-            total_rank += s['rank']
-            total_trust += s['trust']
-            total_consensus += s['consensus']
-            total_dividends += s['dividends']
-            total_emission += s['emission']
-            total_incentive += s['incentive']
-
-        TABLE_DATA = [ HUD.rich_row(s) for s in stats ]
-        print ( TABLE_DATA )
-        TABLE_DATA = [row for row in TABLE_DATA if row != None ]
-        TABLE_DATA.sort(key = lambda TABLE_DATA: TABLE_DATA[0])
-        table = Table(show_footer=False)
-        table.title = (
-            "[bold white]HUD" 
-        )
-        table.add_column("[overline white]Name",  str(len(neurons)), footer_style = "overline white", style='white')
-        table.add_column("[overline white]IP", style='blue')
-        table.add_column("[overline white]sshkey", style='green')
-        table.add_column("[overline white]Connected", style='green')
-        table.add_column("[overline white]Branch", style='bold purple')
-        table.add_column("[overline white]Installed")
-        table.add_column("[overline white]Running")
-        table.add_column("[overline white]Registered")
-        table.add_column("[overline white]Uid", footer_style = "overline white", style='yellow')
-        table.add_column("[overline white]Stake", '{:.5f}'.format(total_stake), footer_style = "overline white", justify='right', style='green', no_wrap=True)
-        table.add_column("[overline white]Rank", '{:.5f}'.format(total_rank), footer_style = "overline white", justify='right', style='green', no_wrap=True)
-        table.add_column("[overline white]Trust", '{:.5f}'.format(total_trust), footer_style = "overline white", justify='right', style='green', no_wrap=True)
-        table.add_column("[overline white]Consensus", '{:.5f}'.format(total_consensus), footer_style = "overline white", justify='right', style='green', no_wrap=True)
-        table.add_column("[overline white]Incentive", '{:.5f}'.format(total_incentive), footer_style = "overline white", justify='right', style='green', no_wrap=True)
-        table.add_column("[overline white]Dividends", '{:.5f}'.format(total_dividends), footer_style = "overline white", justify='right', style='green', no_wrap=True)
-        table.add_column("[overline white]Emission", '{:.5f}'.format(total_emission), footer_style = "overline white", justify='right', style='green', no_wrap=True)
-        table.add_column("[overline white]Lastupdate (blocks)", justify='right', no_wrap=True)
-        table.add_column("[overline white]Active", justify='right', style='green', no_wrap=True)
-        table.add_column("[overline white]Coldkey", style='bold blue', no_wrap=False)
-        table.add_column("[overline white]Hotkey", style='blue', no_wrap=False)
-        table.show_footer = True
-
-        for row in TABLE_DATA:
-            table.add_row(*row)
-        table.box = None
-        table.pad_edge = False
-        table.width = None
-        console = Console()
-        console.print(table, width=10000)
+        for hotkey in config:
+            name = "{}-{}".format( project, hotkey )
+            neurons.append( Neuron(
+                name = name,
+                sshkey = config[hotkey]['sshkey'],
+                ip_address = config[hotkey]['ip_address'],
+                wallet = bittensor.wallet( name = project, hotkey=hotkey)
+            ))
+        return HUD( neurons )

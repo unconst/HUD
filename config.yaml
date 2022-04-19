@@ -1,592 +1,151 @@
-Marius:
-  M0:
-    ip_address: 137.184.97.177
-    sshkey: /Users/thebes/.ssh/marius
-  M1:
-    ip_address: 137.184.130.112
-    sshkey: /Users/thebes/.ssh/marius
-  M10:
-    ip_address: 159.223.188.119
-    sshkey: /Users/thebes/.ssh/marius
-  M11:
-    ip_address: 159.223.186.108
-    sshkey: /Users/thebes/.ssh/marius
-  M12:
-    ip_address: 159.223.186.122
-    sshkey: /Users/thebes/.ssh/marius
-  M13:
-    ip_address: 159.223.186.126
-    sshkey: /Users/thebes/.ssh/marius
-  M14:
-    ip_address: 143.244.158.64
-    sshkey: /Users/thebes/.ssh/marius
-  M15:
-    ip_address: 147.182.165.36
-    sshkey: /Users/thebes/.ssh/marius
-  M16:
-    ip_address: 147.182.171.135
-    sshkey: /Users/thebes/.ssh/marius
-  M17:
-    ip_address: 147.182.176.34
-    sshkey: /Users/thebes/.ssh/marius
-  M18:
-    ip_address: 147.182.188.237
-    sshkey: /Users/thebes/.ssh/marius
-  M19:
-    ip_address: 147.182.177.47
-    sshkey: /Users/thebes/.ssh/marius
-  M2:
-    ip_address: 147.182.142.48
-    sshkey: /Users/thebes/.ssh/marius
-  M3:
-    ip_address: 137.184.101.176
-    sshkey: /Users/thebes/.ssh/marius
-  M4:
-    ip_address: 147.182.186.51
-    sshkey: /Users/thebes/.ssh/marius
-  M5:
-    ip_address: 137.184.109.204
-    sshkey: /Users/thebes/.ssh/marius
-  M6:
-    ip_address: 143.198.124.13
-    sshkey: /Users/thebes/.ssh/marius
-  M7:
-    ip_address: 137.184.65.17
-    sshkey: /Users/thebes/.ssh/marius
-  M8:
-    ip_address: 137.184.132.114
-    sshkey: /Users/thebes/.ssh/marius
-  M9:
-    ip_address: 137.184.129.7
-    sshkey: /Users/thebes/.ssh/marius
-Z:
-  Z0:
-    ip_address: 143.198.136.79
-    sshkey: /Users/thebes/.ssh/marius
-  Z1:
-    ip_address: 143.244.186.101
-    sshkey: /Users/thebes/.ssh/marius
-  Z10:
-    ip_address: 137.184.128.55
-    sshkey: /Users/thebes/.ssh/marius
-  Z11:
-    ip_address: 137.184.103.212
-    sshkey: /Users/thebes/.ssh/marius
-  Z12:
-    ip_address: 137.184.141.77
-    sshkey: /Users/thebes/.ssh/marius
-  Z13:
-    ip_address: 137.184.141.108
-    sshkey: /Users/thebes/.ssh/marius
-  Z14:
-    ip_address: 137.184.141.148
-    sshkey: /Users/thebes/.ssh/marius
-  Z15:
-    ip_address: 137.184.135.70
-    sshkey: /Users/thebes/.ssh/marius
-  Z16:
-    ip_address: 137.184.141.109
-    sshkey: /Users/thebes/.ssh/marius
-  Z17:
-    ip_address: 137.184.141.143
-    sshkey: /Users/thebes/.ssh/marius
-  Z18:
-    ip_address: 137.184.141.141
-    sshkey: /Users/thebes/.ssh/marius
-  Z19:
-    ip_address: 137.184.141.124
-    sshkey: /Users/thebes/.ssh/marius
-  Z2:
-    ip_address: 143.198.108.17
-    sshkey: /Users/thebes/.ssh/marius
-  Z20:
-    ip_address: 159.65.51.79
-    sshkey: /Users/thebes/.ssh/marius
-  Z21:
-    ip_address: 206.189.112.235
-    sshkey: /Users/thebes/.ssh/marius
-  Z22:
-    ip_address: 209.97.131.1
-    sshkey: /Users/thebes/.ssh/marius
-  Z23:
-    ip_address: 209.97.135.176
-    sshkey: /Users/thebes/.ssh/marius
-  Z24:
-    ip_address: 209.97.135.203
-    sshkey: /Users/thebes/.ssh/marius
-  Z25:
-    ip_address: 209.97.141.114
-    sshkey: /Users/thebes/.ssh/marius
-  Z26:
-    ip_address: 178.128.160.4
-    sshkey: /Users/thebes/.ssh/marius
-  Z27:
-    ip_address: 178.128.175.105
-    sshkey: /Users/thebes/.ssh/marius
-  Z28:
-    ip_address: 178.128.174.231
-    sshkey: /Users/thebes/.ssh/marius
-  Z29:
-    ip_address: 178.128.166.192
-    sshkey: /Users/thebes/.ssh/marius
-  Z3:
-    ip_address: 143.198.71.176
-    sshkey: /Users/thebes/.ssh/marius
-  Z4:
-    ip_address: 143.198.145.224
-    sshkey: /Users/thebes/.ssh/marius
-  Z5:
-    ip_address: 143.198.65.97
-    sshkey: /Users/thebes/.ssh/marius
-  Z6:
-    ip_address: 137.184.9.176
-    sshkey: /Users/thebes/.ssh/marius
-  Z7:
-    ip_address: 147.182.253.124
-    sshkey: /Users/thebes/.ssh/marius
-  Z8:
-    ip_address: 143.244.179.158
-    sshkey: /Users/thebes/.ssh/marius
-  Z9:
-    ip_address: 147.182.240.118
-    sshkey: /Users/thebes/.ssh/marius
-altura:
-  A0:
-    ip_address: 159.223.139.254
-    sshkey: /Users/thebes/.ssh/marius
-  A1:
-    ip_address: 67.207.83.30
-    sshkey: /Users/thebes/.ssh/marius
-  A2:
-    ip_address: 159.223.104.2
-    sshkey: /Users/thebes/.ssh/marius
-  A3:
-    ip_address: 157.245.88.148
-    sshkey: /Users/thebes/.ssh/marius
-  A4:
-    ip_address: 137.184.26.158
-    sshkey: /Users/thebes/.ssh/marius
-  A5:
-    ip_address: 137.184.194.188
-    sshkey: /Users/thebes/.ssh/marius
-  A6:
-    ip_address: 137.184.106.162
-    sshkey: /Users/thebes/.ssh/marius
-  A7:
-    ip_address: 137.184.23.124
-    sshkey: /Users/thebes/.ssh/marius
-  A8:
-    ip_address: 159.223.123.41
-    sshkey: /Users/thebes/.ssh/marius
-  A9:
-    ip_address: 159.223.151.57
-    sshkey: /Users/thebes/.ssh/marius
-beast:
-  B0:
-    ip_address: 167.99.234.182
-    sshkey: /Users/thebes/.ssh/marius
-  B1:
-    ip_address: 192.241.131.162
-    sshkey: /Users/thebes/.ssh/marius
-  B2:
-    ip_address: 167.99.234.207
-    sshkey: /Users/thebes/.ssh/marius
-  B3:
-    ip_address: 167.99.234.201
-    sshkey: /Users/thebes/.ssh/marius
-halo:
-  H0:
-    ip_address: 165.232.154.238
-    sshkey: /Users/thebes/.ssh/marius
-  H1:
-    ip_address: 147.182.202.185
-    sshkey: /Users/thebes/.ssh/marius
-  H2:
-    ip_address: 147.182.233.83
-    sshkey: /Users/thebes/.ssh/marius
-  H3:
-    ip_address: 147.182.235.16
-    sshkey: /Users/thebes/.ssh/marius
-  H4:
-    ip_address: 137.184.117.160
-    sshkey: /Users/thebes/.ssh/marius
-  H5:
-    ip_address: 137.184.117.26
-    sshkey: /Users/thebes/.ssh/marius
-  H6:
-    ip_address: 137.184.117.220
-    sshkey: /Users/thebes/.ssh/marius
-  H7:
-    ip_address: 137.184.123.87
-    sshkey: /Users/thebes/.ssh/marius
-  H8:
-    ip_address: 137.184.125.141
-    sshkey: /Users/thebes/.ssh/marius
-  H9:
-    ip_address: 137.184.127.121
-    sshkey: /Users/thebes/.ssh/marius
-jello:
-  J0:
-    ip_address: 137.184.97.224
-    sshkey: /Users/thebes/.ssh/marius
-  J1:
-    ip_address: 137.184.110.78
-    sshkey: /Users/thebes/.ssh/marius
-  J2:
-    ip_address: 137.184.102.196
-    sshkey: /Users/thebes/.ssh/marius
-  J3:
-    ip_address: 137.184.102.197
-    sshkey: /Users/thebes/.ssh/marius
-  J4:
-    ip_address: 137.184.105.61
-    sshkey: /Users/thebes/.ssh/marius
-  J5:
-    ip_address: 137.184.110.86
-    sshkey: /Users/thebes/.ssh/marius
-  J6:
-    ip_address: 137.184.105.56
-    sshkey: /Users/thebes/.ssh/marius
-  J7:
-    ip_address: 137.184.105.3
-    sshkey: /Users/thebes/.ssh/marius
-  J8:
-    ip_address: 137.184.105.12
-    sshkey: /Users/thebes/.ssh/marius
-  J9:
-    ip_address: 137.184.105.85
-    sshkey: /Users/thebes/.ssh/marius
-nukes:
-  N0:
-    ip_address: 137.184.92.63
-    sshkey: /Users/thebes/.ssh/marius
-  N1:
-    ip_address: 143.198.99.2
-    sshkey: /Users/thebes/.ssh/marius
-  N2:
-    ip_address: 165.232.143.207
-    sshkey: /Users/thebes/.ssh/marius
-  N3:
-    ip_address: 143.244.185.60
-    sshkey: /Users/thebes/.ssh/marius
-  N4:
-    ip_address: 161.35.233.164
-    sshkey: /Users/thebes/.ssh/marius
-  N5:
-    ip_address: 143.198.131.245
-    sshkey: /Users/thebes/.ssh/marius
-  N6:
-    ip_address: 143.198.146.173
-    sshkey: /Users/thebes/.ssh/marius
-  N7:
-    ip_address: 147.182.232.77
-    sshkey: /Users/thebes/.ssh/marius
-  N8:
-    ip_address: 147.182.246.54
-    sshkey: /Users/thebes/.ssh/marius
-  N9:
-    ip_address: 137.184.89.141
-    sshkey: /Users/thebes/.ssh/marius
-rambo:
-  K0:
-    ip_address: 68.183.129.133
-    sshkey: /Users/thebes/.ssh/marius
-  K1:
-    ip_address: 68.183.129.166
-    sshkey: /Users/thebes/.ssh/marius
-  K2:
-    ip_address: 68.183.129.140
-    sshkey: /Users/thebes/.ssh/marius
-  K3:
-    ip_address: 68.183.129.134
-    sshkey: /Users/thebes/.ssh/marius
-  K4:
-    ip_address: 68.183.129.135
-    sshkey: /Users/thebes/.ssh/marius
-  K5:
-    ip_address: 68.183.129.128
-    sshkey: /Users/thebes/.ssh/marius
-  K6:
-    ip_address: 68.183.129.123
-    sshkey: /Users/thebes/.ssh/marius
-  K8:
-    ip_address: 68.183.96.246
-    sshkey: /Users/thebes/.ssh/marius
-  K9:
-    ip_address: 167.99.147.99
-    sshkey: /Users/thebes/.ssh/marius
-  X7:
-    ip_address: 68.183.129.127
-    sshkey: /Users/thebes/.ssh/marius
-right:
-  R0:
-    ip_address: 137.184.210.71
-    sshkey: /Users/thebes/.ssh/marius
-  R1:
-    ip_address: 167.172.139.43
-    sshkey: /Users/thebes/.ssh/marius
-  R2:
-    ip_address: 159.223.172.108
-    sshkey: /Users/thebes/.ssh/marius
-  R3:
-    ip_address: 159.223.191.244
-    sshkey: /Users/thebes/.ssh/marius
-  R5:
-    ip_address: 159.223.191.245
-    sshkey: /Users/thebes/.ssh/marius
-  R6:
-    ip_address: 159.223.124.240
-    sshkey: /Users/thebes/.ssh/marius
-  R7:
-    ip_address: 159.89.230.44
-    sshkey: /Users/thebes/.ssh/marius
-  R8:
-    ip_address: 159.89.230.50
-    sshkey: /Users/thebes/.ssh/marius
-  R9:
-    ip_address: 159.223.184.35
-    sshkey: /Users/thebes/.ssh/marius
-titan:
-  T0:
-    ip_address: 68.183.141.184
-    sshkey: /Users/thebes/.ssh/marius
-  T1:
-    ip_address: 68.183.141.199
-    sshkey: /Users/thebes/.ssh/marius
-  T2:
-    ip_address: 68.183.141.191
-    sshkey: /Users/thebes/.ssh/marius
-  T3:
-    ip_address: 68.183.141.204
-    sshkey: /Users/thebes/.ssh/marius
-  T4:
-    ip_address: 68.183.141.196
-    sshkey: /Users/thebes/.ssh/marius
-  T5:
-    ip_address: 68.183.141.181
-    sshkey: /Users/thebes/.ssh/marius
-  T6:
-    ip_address: 68.183.141.203
-    sshkey: /Users/thebes/.ssh/marius
-  T7:
-    ip_address: 68.183.141.190
-    sshkey: /Users/thebes/.ssh/marius
-  T8:
-    ip_address: 68.183.141.188
-    sshkey: /Users/thebes/.ssh/marius
-  T9:
-    ip_address: 68.183.141.177
-    sshkey: /Users/thebes/.ssh/marius
-wicka:
+W:
   W0:
-    ip_address: 167.99.154.213
+    ip_address: 134.122.15.237
     sshkey: /Users/thebes/.ssh/marius
   W1:
-    ip_address: 206.81.7.221
+    ip_address: 134.209.43.255
+    sshkey: /Users/thebes/.ssh/marius
+  W10:
+    ip_address: 143.198.16.184
+    sshkey: /Users/thebes/.ssh/marius
+  W11:
+    ip_address: 143.198.16.216
+    sshkey: /Users/thebes/.ssh/marius
+  W12:
+    ip_address: 134.122.4.156
+    sshkey: /Users/thebes/.ssh/marius
+  W13:
+    ip_address: 143.198.24.13
+    sshkey: /Users/thebes/.ssh/marius
+  W14:
+    ip_address: 143.198.24.65
+    sshkey: /Users/thebes/.ssh/marius
+  W15:
+    ip_address: 143.198.24.76
+    sshkey: /Users/thebes/.ssh/marius
+  W16:
+    ip_address: 143.198.20.27
+    sshkey: /Users/thebes/.ssh/marius
+  W17:
+    ip_address: 143.198.28.76
+    sshkey: /Users/thebes/.ssh/marius
+  W18:
+    ip_address: 143.198.28.240
+    sshkey: /Users/thebes/.ssh/marius
+  W19:
+    ip_address: 143.198.18.138
     sshkey: /Users/thebes/.ssh/marius
   W2:
-    ip_address: 206.81.9.86
+    ip_address: 167.172.28.158
+    sshkey: /Users/thebes/.ssh/marius
+  W20:
+    ip_address: 143.198.18.171
+    sshkey: /Users/thebes/.ssh/marius
+  W21:
+    ip_address: 143.198.18.181
+    sshkey: /Users/thebes/.ssh/marius
+  W22:
+    ip_address: 143.198.18.183
+    sshkey: /Users/thebes/.ssh/marius
+  W23:
+    ip_address: 143.198.26.23
+    sshkey: /Users/thebes/.ssh/marius
+  W24:
+    ip_address: 143.198.11.1
+    sshkey: /Users/thebes/.ssh/marius
+  W25:
+    ip_address: 143.198.26.244
+    sshkey: /Users/thebes/.ssh/marius
+  W26:
+    ip_address: 143.198.22.50
+    sshkey: /Users/thebes/.ssh/marius
+  W27:
+    ip_address: 167.71.91.172
+    sshkey: /Users/thebes/.ssh/marius
+  W28:
+    ip_address: 64.225.13.57
+    sshkey: /Users/thebes/.ssh/marius
+  W29:
+    ip_address: 64.225.7.184
     sshkey: /Users/thebes/.ssh/marius
   W3:
-    ip_address: 167.99.2.11
+    ip_address: 134.122.11.122
+    sshkey: /Users/thebes/.ssh/marius
+  W30:
+    ip_address: 159.203.166.236
+    sshkey: /Users/thebes/.ssh/marius
+  W31:
+    ip_address: 64.225.29.215
+    sshkey: /Users/thebes/.ssh/marius
+  W32:
+    ip_address: 143.198.30.11
+    sshkey: /Users/thebes/.ssh/marius
+  W33:
+    ip_address: 143.198.30.87
+    sshkey: /Users/thebes/.ssh/marius
+  W34:
+    ip_address: 143.198.17.0
+    sshkey: /Users/thebes/.ssh/marius
+  W35:
+    ip_address: 143.198.17.55
+    sshkey: /Users/thebes/.ssh/marius
+  W36:
+    ip_address: 143.198.17.221
+    sshkey: /Users/thebes/.ssh/marius
+  W37:
+    ip_address: 68.183.159.153
+    sshkey: /Users/thebes/.ssh/marius
+  W38:
+    ip_address: 157.245.119.69
+    sshkey: /Users/thebes/.ssh/marius
+  W39:
+    ip_address: 167.172.228.71
     sshkey: /Users/thebes/.ssh/marius
   W4:
-    ip_address: 165.227.84.18
+    ip_address: 134.122.11.146
+    sshkey: /Users/thebes/.ssh/marius
+  W40:
+    ip_address: 161.35.186.105
+    sshkey: /Users/thebes/.ssh/marius
+  W41:
+    ip_address: 143.198.25.98
+    sshkey: /Users/thebes/.ssh/marius
+  W42:
+    ip_address: 143.198.25.102
+    sshkey: /Users/thebes/.ssh/marius
+  W43:
+    ip_address: 143.198.21.74
+    sshkey: /Users/thebes/.ssh/marius
+  W44:
+    ip_address: 143.198.29.81
+    sshkey: /Users/thebes/.ssh/marius
+  W45:
+    ip_address: 143.198.29.120
+    sshkey: /Users/thebes/.ssh/marius
+  W46:
+    ip_address: 143.198.29.129
+    sshkey: /Users/thebes/.ssh/marius
+  W47:
+    ip_address: 167.172.255.193
+    sshkey: /Users/thebes/.ssh/marius
+  W48:
+    ip_address: 143.198.29.140
+    sshkey: /Users/thebes/.ssh/marius
+  W49:
+    ip_address: 143.198.29.208
     sshkey: /Users/thebes/.ssh/marius
   W5:
-    ip_address: 167.99.231.53
+    ip_address: 159.89.183.255
     sshkey: /Users/thebes/.ssh/marius
   W6:
-    ip_address: 143.244.174.245
+    ip_address: 143.198.7.110
     sshkey: /Users/thebes/.ssh/marius
   W7:
-    ip_address: 167.99.149.212
+    ip_address: 143.198.7.192
     sshkey: /Users/thebes/.ssh/marius
   W8:
-    ip_address: 142.93.2.162
+    ip_address: 167.172.230.231
     sshkey: /Users/thebes/.ssh/marius
   W9:
-    ip_address: 147.182.186.113
-    sshkey: /Users/thebes/.ssh/marius
-x:
-  X0:
-    ip_address: 143.198.163.48
-    sshkey: /Users/thebes/.ssh/marius
-  X1:
-    ip_address: 137.184.99.195
-    sshkey: /Users/thebes/.ssh/marius
-  X10:
-    ip_address: 137.184.88.141
-    sshkey: /Users/thebes/.ssh/marius
-  X11:
-    ip_address: 137.184.84.228
-    sshkey: /Users/thebes/.ssh/marius
-  X12:
-    ip_address: 137.184.92.205
-    sshkey: /Users/thebes/.ssh/marius
-  X13:
-    ip_address: 137.184.84.8
-    sshkey: /Users/thebes/.ssh/marius
-  X14:
-    ip_address: 137.184.86.202
-    sshkey: /Users/thebes/.ssh/marius
-  X15:
-    ip_address: 137.184.94.106
-    sshkey: /Users/thebes/.ssh/marius
-  X16:
-    ip_address: 137.184.93.105
-    sshkey: /Users/thebes/.ssh/marius
-  X17:
-    ip_address: 137.184.83.32
-    sshkey: /Users/thebes/.ssh/marius
-  X18:
-    ip_address: 137.184.93.66
-    sshkey: /Users/thebes/.ssh/marius
-  X19:
-    ip_address: 137.184.81.41
-    sshkey: /Users/thebes/.ssh/marius
-  X2:
-    ip_address: 147.182.184.203
-    sshkey: /Users/thebes/.ssh/marius
-  X20:
-    ip_address: 143.198.68.84
-    sshkey: /Users/thebes/.ssh/marius
-  X21:
-    ip_address: 143.198.67.106
-    sshkey: /Users/thebes/.ssh/marius
-  X22:
-    ip_address: 143.198.97.90
-    sshkey: /Users/thebes/.ssh/marius
-  X23:
-    ip_address: 143.244.184.47
-    sshkey: /Users/thebes/.ssh/marius
-  X24:
-    ip_address: 147.182.237.124
-    sshkey: /Users/thebes/.ssh/marius
-  X25:
-    ip_address: 137.184.87.216
-    sshkey: /Users/thebes/.ssh/marius
-  X26:
-    ip_address: 137.184.12.191
-    sshkey: /Users/thebes/.ssh/marius
-  X27:
-    ip_address: 137.184.83.72
-    sshkey: /Users/thebes/.ssh/marius
-  X28:
-    ip_address: 137.184.83.88
-    sshkey: /Users/thebes/.ssh/marius
-  X29:
-    ip_address: 137.184.87.20
-    sshkey: /Users/thebes/.ssh/marius
-  X3:
-    ip_address: 143.198.184.85
-    sshkey: /Users/thebes/.ssh/marius
-  X4:
-    ip_address: 137.184.52.234
-    sshkey: /Users/thebes/.ssh/marius
-  X5:
-    ip_address: 137.184.70.197
-    sshkey: /Users/thebes/.ssh/marius
-  X6:
-    ip_address: 137.184.101.79
-    sshkey: /Users/thebes/.ssh/marius
-  X7:
-    ip_address: 137.184.150.31
-    sshkey: /Users/thebes/.ssh/marius
-  X8:
-    ip_address: 137.184.101.120
-    sshkey: /Users/thebes/.ssh/marius
-  X9:
-    ip_address: 137.184.220.62
-    sshkey: /Users/thebes/.ssh/marius
-Y:
-  Y0:
-    ip_address: 143.198.188.82
-    sshkey: /Users/thebes/.ssh/marius
-  Y1:
-    ip_address: 143.198.185.39
-    sshkey: /Users/thebes/.ssh/marius
-  Y10:
-    ip_address: 159.223.236.228
-    sshkey: /Users/thebes/.ssh/marius
-  Y11:
-    ip_address: 159.223.226.23
-    sshkey: /Users/thebes/.ssh/marius
-  Y12:
-    ip_address: 159.223.226.0
-    sshkey: /Users/thebes/.ssh/marius
-  Y13:
-    ip_address: 188.166.111.50
-    sshkey: /Users/thebes/.ssh/marius
-  Y14:
-    ip_address: 159.223.226.22
-    sshkey: /Users/thebes/.ssh/marius
-  Y15:
-    ip_address: 159.223.226.36
-    sshkey: /Users/thebes/.ssh/marius
-  Y16:
-    ip_address: 159.223.226.39
-    sshkey: /Users/thebes/.ssh/marius
-  Y17:
-    ip_address: 159.223.226.32
-    sshkey: /Users/thebes/.ssh/marius
-  Y18:
-    ip_address: 159.223.226.26
-    sshkey: /Users/thebes/.ssh/marius
-  Y19:
-    ip_address: 159.223.226.31
-    sshkey: /Users/thebes/.ssh/marius
-  Y2:
-    ip_address: 143.198.185.204
-    sshkey: /Users/thebes/.ssh/marius
-  Y20:
-    ip_address: 159.223.226.43
-    sshkey: /Users/thebes/.ssh/marius
-  Y21:
-    ip_address: 159.223.226.40
-    sshkey: /Users/thebes/.ssh/marius
-  Y22:
-    ip_address: 128.199.34.202
-    sshkey: /Users/thebes/.ssh/marius
-  Y23:
-    ip_address: 159.223.226.45
-    sshkey: /Users/thebes/.ssh/marius
-  Y24:
-    ip_address: 159.223.226.46
-    sshkey: /Users/thebes/.ssh/marius
-  Y25:
-    ip_address: 159.223.226.44
-    sshkey: /Users/thebes/.ssh/marius
-  Y26:
-    ip_address: 159.223.226.47
-    sshkey: /Users/thebes/.ssh/marius
-  Y27:
-    ip_address: 159.223.226.50
-    sshkey: /Users/thebes/.ssh/marius
-  Y28:
-    ip_address: 159.223.226.52
-    sshkey: /Users/thebes/.ssh/marius
-  Y29:
-    ip_address: 159.223.226.59
-    sshkey: /Users/thebes/.ssh/marius
-  Y3:
-    ip_address: 137.184.23.238
-    sshkey: /Users/thebes/.ssh/marius
-  Y4:
-    ip_address: 137.184.144.60
-    sshkey: /Users/thebes/.ssh/marius
-  Y5:
-    ip_address: 137.184.55.85
-    sshkey: /Users/thebes/.ssh/marius
-  Y6:
-    ip_address: 159.223.136.147
-    sshkey: /Users/thebes/.ssh/marius
-  Y7:
-    ip_address: 159.223.112.137
-    sshkey: /Users/thebes/.ssh/marius
-  Y8:
-    ip_address: 159.223.169.245
-    sshkey: /Users/thebes/.ssh/marius
-  Y9:
-    ip_address: 159.223.155.245
+    ip_address: 143.198.16.77
     sshkey: /Users/thebes/.ssh/marius
