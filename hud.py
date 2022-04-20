@@ -186,6 +186,9 @@ class HUD(list):
         else:
             self.values = neurons
         self.values = sorted(self.values)
+        self._set()
+
+    def _set(self):
         super(HUD, self).__init__( self.values )
         self.ndict = {}
         for n in self.values:
@@ -209,12 +212,28 @@ class HUD(list):
             self.values[idx] = value.values
         else:
             self.values[idx] = value
+        self._set()
+
+    def __iadd__(self, other):
+        self.values.extend( other.values )
+        self._set()
+        return self  
+
+    def __add__(self, other):
+        self.values.extend( other.values )
+        self._set()
+        return self  
 
     def append(self, item):
-        self.values.append( self.item )
+        print(self, self.values, item )
+        self.values.extend( item.values )
+        self._set()
+        print(self)
+        return self
 
-    def extend(self, t):
-        self.values.extend( t )
+    def extend(self, items):
+        self.values.extend( items )
+        self._set()
 
     def item(self):
         if len(self) == 1:

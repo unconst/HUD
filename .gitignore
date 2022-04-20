@@ -1,2 +1,4 @@
 history/*
 configs/*
+.ipynb_checkpoints
+__pycache__
