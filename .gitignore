@@ -1,4 +1,5 @@
 history/*
 configs/*
+!configs/.gitkeep
 .ipynb_checkpoints
 __pycache__
