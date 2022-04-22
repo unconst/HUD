@@ -534,8 +534,17 @@ class HUD(list):
                 results[key] = False
         return results
 
+
+    def checkout( self, branch_str:str = 'master', disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, fabric.Result]:
+        return HUD._checkout(self, branch_str, disown, hide, warn, max_threads = max_threads, timeout = timeout )
+    
+    @staticmethod
+    def _checkout (neurons: Union[ List[Neuron], 'HUD' ], branch_str:str = 'master', disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, fabric.Result]:
+        neurons = neurons if isinstance(neurons, list) else HUD(neurons)
+        return HUD._run( neurons, script = "cd ~/.bittensor/bittensor ; git checkout %s".format( branch_str ), disown=disown, hide=hide, warn=warn, max_threads = max_threads, timeout = timeout, stdout=False )
+
     def pull( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, fabric.Result]:
-        return HUD._pull(self.values, disown, hide, warn, max_threads = max_threads, timeout = timeout )
+        return HUD._pull(self, disown, hide, warn, max_threads = max_threads, timeout = timeout )
     
     @staticmethod
     def _pull( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, fabric.Result]:
@@ -543,7 +552,7 @@ class HUD(list):
         return HUD._run( neurons, script = "rm -rf ~/HUD && git clone --recurse-submodules https://github.com/unconst/HUD.git ~/HUD", disown=disown, hide=hide, warn=warn, max_threads = max_threads, timeout = timeout, stdout=False )
 
     def get_logs( self, lines:int = 5, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, str]:
-        return HUD._get_logs(self.values, lines = lines, disown=disown, hide=hide, warn=warn, max_threads = max_threads, timeout = timeout )
+        return HUD._get_logs(self, lines = lines, disown=disown, hide=hide, warn=warn, max_threads = max_threads, timeout = timeout )
     
     @staticmethod
     def _get_logs( neurons: Union[ List[Neuron], 'HUD' ], lines:int = 5, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, str]:
@@ -551,7 +560,7 @@ class HUD(list):
         return HUD._run( neurons, script = "tail -n {} /root/.pm2/logs/script-out.log".format( lines ), disown=disown, hide=hide, warn=warn, stdout=True )
 
     def pow( self, targets: Union[ Neuron, List[Neuron], 'HUD' ], pow_key: int = int(time.time()), n_procs: int = 1, network:str = "nakamoto", disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> None:
-        return HUD._pow( self.values, targets = targets, n_procs = n_procs, network = network, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        return HUD._pow( self, targets = targets, n_procs = n_procs, network = network, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
 
     @staticmethod
     def _pow( workers: Union[ List[Neuron], 'HUD' ], targets: Union[ Neuron, List[Neuron], 'HUD' ], n_procs: int = 1, network:str = "nakamoto", disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT):

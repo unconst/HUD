@@ -13,6 +13,7 @@ import pandas
 import argparse
 import json
 import sys
+from Crypto.Hash import keccak
 from typing import Any, Tuple, List, Union, Optional
 
 from loguru import logger
@@ -192,8 +193,9 @@ def solve_(nonce_start, nonce_end, block_bytes, difficulty, block_hash, block_nu
         # Create seal.
         nonce_bytes = binascii.hexlify(nonce.to_bytes(8, 'little'))
         pre_seal = nonce_bytes + block_bytes
-        seal = hashlib.sha256( bytearray(hex_bytes_to_u8_list(pre_seal)) ).digest()
-    
+        seal_sh256 = hashlib.sha256( bytearray(hex_bytes_to_u8_list(pre_seal)) ).digest()
+        kec = keccak.new(digest_bits=256)
+        seal = kec.update( seal_sh256 ).digest()
         seal_number = int.from_bytes(seal, "big")
         product = seal_number * difficulty
 
