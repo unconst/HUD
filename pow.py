@@ -109,7 +109,7 @@ def write_dict_to_file(filename, dict_to_write):
     with open(filename, 'w') as f:
         json.dump(dict_to_write, f)
 
-def solve_for_difficulty_fast( subtensor, wallet, num_processes: int = None, update_interval: int = 500000 ) -> Tuple[int, int, Any, int, Any]:
+def solve_for_difficulty_fast( subtensor, wallet, num_processes: int = 1, update_interval: int = 500000 ) -> Tuple[int, int, Any, int, Any]:
     """
     Solves the POW for registration using multiprocessing.
     Args:
@@ -236,9 +236,9 @@ def config():
 
 def main(config):
     logger.success("Started POW")
-    subtensor = bittensor.subtensor(config)
     wallet = bittensor.wallet(config)
     while True:
+        subtensor = bittensor.subtensor(network = "nakamoto", chain_endpoint="159.223.185.195:9944")
         if wallet.is_registered( subtensor = subtensor ):
             logger.info(f"{wallet.name} is registered to {subtensor.network}")
         pow = create_pow( subtensor, wallet )

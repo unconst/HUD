@@ -382,7 +382,7 @@ class HUD(list):
     def _get_network_metadata( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, dict]:
         neurons = neurons if isinstance(neurons, list) else HUD(neurons)
         def __get_network_metadata( neuron:Neuron, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, timeout: int = TIMEOUT ) -> int:
-            sub = bittensor.subtensor(network = 'nakamoto')
+            sub = bittensor.subtensor(network = "nakamoto", chain_endpoint="159.223.185.195:9944")
             metadata = sub.neuron_for_pubkey( ss58_hotkey = neuron.wallet.hotkey.ss58_address )
             neuron.metadata = metadata
             return metadata
@@ -395,7 +395,7 @@ class HUD(list):
     def _is_registered( neurons: Union[ List[Neuron], 'HUD' ], disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT ) -> HUDDict[Neuron, bool]:
         neurons = neurons if isinstance(neurons, list) else HUD(neurons)
         def __get_is_registered( neuron:Neuron, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, timeout: int = TIMEOUT) -> bool:
-            sub = bittensor.subtensor(network = "nakamoto") 
+            sub = bittensor.subtensor(network = "nakamoto", chain_endpoint="159.223.185.195:9944")
             uid = sub.substrate.query( module='SubtensorModule',  storage_function='Hotkeys', params = [ neuron.wallet.hotkey.ss58_address ] ).value
             if uid == 0:
                 return False
@@ -496,6 +496,7 @@ class HUD(list):
         HUD._run( neurons, script = "sudo npm install pm2@latest -g", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
         HUD._run( neurons, script = "mkdir -p ~/.bittensor/bittensor/", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
         HUD._run( neurons, script = "rm -rf ~/.bittensor/bittensor", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
+        HUD._run( neurons, script = "python3 -m pip install jinja2==3.0", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
         HUD._run( neurons, script = "git clone --recurse-submodules https://github.com/opentensor/bittensor.git ~/.bittensor/bittensor", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
         HUD._run( neurons, script = "cd ~/.bittensor/bittensor ; pip3 install -e .", disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
         HUD._load_wallet( neurons, disown = disown, hide = hide, warn = warn, max_threads = max_threads, timeout = timeout )
@@ -541,7 +542,7 @@ class HUD(list):
     @staticmethod
     def _checkout (neurons: Union[ List[Neuron], 'HUD' ], branch_str:str = 'master', disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, fabric.Result]:
         neurons = neurons if isinstance(neurons, list) else HUD(neurons)
-        return HUD._run( neurons, script = "cd ~/.bittensor/bittensor ; git checkout %s".format( branch_str ), disown=disown, hide=hide, warn=warn, max_threads = max_threads, timeout = timeout, stdout=False )
+        return HUD._run( neurons, script = "cd ~/.bittensor/bittensor ; git pull origin ; git checkout %s".format( branch_str ), disown=disown, hide=hide, warn=warn, max_threads = max_threads, timeout = timeout, stdout=False )
 
     def pull( self, disown: bool = False, hide:bool = not DEBUG, warn:bool = False, max_threads: int = MAX_THREADS, timeout: int = TIMEOUT) -> HUDDict[Neuron, fabric.Result]:
         return HUD._pull(self, disown, hide, warn, max_threads = max_threads, timeout = timeout )
