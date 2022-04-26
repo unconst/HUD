@@ -243,6 +243,9 @@ def main(config):
             logger.info(f"{wallet.name} is registered to {subtensor.network}")
         pow = create_pow( subtensor, wallet )
         while pow['block_number'] >= subtensor.get_current_block() - 3:
+            if pow['block_number'] >= subtensor.get_current_block() - 1:
+                time.sleep(5)
+                continue
             with subtensor.substrate as substrate:
                 # create extrinsic call
                 call = substrate.compose_call( 
